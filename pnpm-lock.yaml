@@ -11,6 +11,12 @@ dependencies:
   '@tauri-apps/api':
     specifier: ^1.5.2
     version: 1.5.3
+  ag-grid-community:
+    specifier: ^31.0.3
+    version: 31.0.3
+  ag-grid-react:
+    specifier: ^31.0.3
+    version: 31.0.3(react-dom@18.2.0)(react@18.2.0)
   autoprefixer:
     specifier: ^10.4.17
     version: 10.4.17(postcss@8.4.35)
@@ -1154,6 +1160,22 @@ packages:
       - supports-color
     dev: true
 
+  /ag-grid-community@31.0.3:
+    resolution: {integrity: sha512-k81YmLaOQOab9BavYD+Pw2smZSl6TXOJqj9hRuf70XQl3EknOHCGcra7joJxZRJLMKE/HdR+u33TNyX4TCuWfg==}
+    dev: false
+
+  /ag-grid-react@31.0.3(react-dom@18.2.0)(react@18.2.0):
+    resolution: {integrity: sha512-CE4Z5Rdb0H3MFBhmge9854AyDvI4DoG7ZoUJRFB1p2pu5ANVe6tv7cwEI/ugHemEXRRP6s5uvW+ndv0Q6x1/+Q==}
+    peerDependencies:
+      react: ^16.3.0 || ^17.0.0 || ^18.0.0
+      react-dom: ^16.3.0 || ^17.0.0 || ^18.0.0
+    dependencies:
+      ag-grid-community: 31.0.3
+      prop-types: 15.8.1
+      react: 18.2.0
+      react-dom: 18.2.0(react@18.2.0)
+    dev: false
+
   /ansi-regex@5.0.1:
     resolution: {integrity: sha512-quJQXlTSUGL2LH9SUXo8VwsY4soanhgo6LNSm84E1LBcE8s3O0wpdiRzyR9z/ZZJMlMWv37qOOb9pdJlMUEKFQ==}
     engines: {node: '>=8'}
@@ -1660,7 +1682,6 @@ packages:
   /object-assign@4.1.1:
     resolution: {integrity: sha512-rJgTQnkUnH1sFw8yT6VSU3zD3sWmu6sZhIseY8VX+GRu3P6F7Fu+JNDoXfklElbLJSnc3FUQHVe4cU5hj+BcUg==}
     engines: {node: '>=0.10.0'}
-    dev: true
 
   /object-hash@3.0.0:
     resolution: {integrity: sha512-RSn9F68PjH9HqtltsSnqYC1XXoWe9Bju5+213R98cNGttag9q9yAOTzdbsqvIa7aNm5WffBZFpWYr2aWrklWAw==}
@@ -1770,6 +1791,14 @@ packages:
       picocolors: 1.0.0
       source-map-js: 1.0.2
 
+  /prop-types@15.8.1:
+    resolution: {integrity: sha512-oj87CgZICdulUohogVAR7AjlC0327U4el4L6eAvOqCeudMDVU0NThNaV+b9Df4dXgSP1gXMTnPdhfe/2qDH5cg==}
+    dependencies:
+      loose-envify: 1.4.0
+      object-assign: 4.1.1
+      react-is: 16.13.1
+    dev: false
+
   /queue-microtask@1.2.3:
     resolution: {integrity: sha512-NuaNSa6flKT5JaSYQzJok04JzTL1CA6aGhv5rfLW3PgqA+M2ChpZQnAC8h8i4ZFkBS8X5RqkDBHA7r4hej3K9A==}
     dev: true
@@ -1782,6 +1811,10 @@ packages:
       loose-envify: 1.4.0
       react: 18.2.0
       scheduler: 0.23.0
+    dev: false
+
+  /react-is@16.13.1:
+    resolution: {integrity: sha512-24e6ynE2H+OKt4kqsOvNd8kBpV65zoxbA4BVsEOB3ARVWQki/DHzaUoC5KuON/BiccDaCCTZBuOcfZs70kR8bQ==}
     dev: false
 
   /react-refresh@0.14.0:
