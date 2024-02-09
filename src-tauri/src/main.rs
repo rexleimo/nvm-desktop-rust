@@ -1,6 +1,9 @@
 // Prevents additional console window on Windows in release, DO NOT REMOVE!!
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+use regex::Regex;
+use tauri::api::version;
+
 // Learn more about Tauri commands at https://tauri.app/v1/guides/features/command
 #[tauri::command]
 fn greet(name: &str) -> String {
@@ -8,8 +11,23 @@ fn greet(name: &str) -> String {
 }
 
 #[tauri::command]
-async fn get_version_list() -> Result<(), String> {
-  Ok(())
+async fn get_version_list() -> Vec<String> {
+    let resp = reqwest::get("https://nodejs.org/dist/").await;
+    match resp {
+        Ok(body) => {
+            let text = body.text().await.unwrap();
+            let re = Regex::new(r#"<a href="(v[^"/]+/)">"#).unwrap();
+            let captures_iter = re.captures_iter(&text);
+            let mut versions = Vec::new();
+            for capture in captures_iter {
+                if let Some(version) = capture.get(1) {
+                    versions.push(version.as_str().replace("/", "").to_string());
+                }
+            }
+            versions
+        }
+        Err(_) => Vec::new(),
+    }
 }
 
 fn main() {
