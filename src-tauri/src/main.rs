@@ -1,17 +1,142 @@
 // Prevents additional console window on Windows in release, DO NOT REMOVE!!
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
-use regex::Regex;
+use std::{
+    error::Error,
+    fs::{self, File, OpenOptions},
+    io::{self, BufReader, Read, Write},
+    path::Path,
+};
 
-// Learn more about Tauri commands at https://tauri.app/v1/guides/features/command
-#[tauri::command]
-fn greet(name: &str) -> String {
-    format!("Hello, {}! You've been greeted from Rust!", name)
+use regex::Regex;
+use reqwest::Client;
+use serde::{Deserialize, Serialize};
+use sysinfo::System;
+use zip::ZipArchive;
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+struct Version {
+    name: String,
+    status: i16,
 }
 
-#[tauri::command]
-async fn get_version_list() -> Vec<String> {
-    let resp = reqwest::get("https://nodejs.org/dist/").await;
+#[derive(Debug)]
+#[warn(dead_code)]
+struct SystemInfo {
+    name: String,
+    cpu_arch: String,
+}
+
+static NODE_URL: &str = "https://nodejs.org/dist/";
+
+fn get_system_info() -> SystemInfo {
+    let mut system = System::new_all();
+    system.refresh_all();
+    SystemInfo {
+        name: System::name().unwrap(),
+        cpu_arch: System::cpu_arch().unwrap(),
+    }
+}
+
+fn unzip(zip_path: &str, dest_path: &str) {
+    let file = File::open(zip_path).unwrap();
+    let mut zip = ZipArchive::new(BufReader::new(file)).unwrap();
+
+    let  target = Path::new(&dest_path);
+
+    if !target.exists() {
+        let _ = fs::create_dir_all(target).map_err(|e| {
+            println!("{}", e);
+        });
+    }
+
+    for i in 0..zip.len() {
+        let mut file = zip.by_index(i).unwrap();
+        if file.is_dir() {
+            let target = target.join(Path::new(&file.name().replace("\\", "")));
+            fs::create_dir_all(target).unwrap();
+        } else {
+            let file_path = target.join(Path::new(file.name()));
+            let mut target_file = if !file_path.exists() {
+                fs::File::create(file_path).unwrap()
+            } else {
+                fs::File::open(file_path).unwrap()
+            };
+            io::copy(&mut file, &mut target_file).unwrap();
+        }
+    }
+}
+
+async fn get_download_node_url(version_str: String) -> Result<bool, Box<dyn std::error::Error>> {
+    // https://nodejs.org/dist/v21.6.1/node-v21.6.1-win-x86.zip
+    let mut node_url = String::new();
+    let mut save_path = String::new();
+    node_url.push_str(NODE_URL);
+    save_path.push_str("./node/");
+    save_path.push_str(&version_str);
+    save_path.push_str(".zip");
+    let system = get_system_info();
+    if "Windows" == system.name {
+        if "x86" == system.cpu_arch {
+            node_url.push_str("v");
+            node_url.push_str(&version_str);
+            node_url.push_str("/node-v");
+            node_url.push_str(&version_str);
+            node_url.push_str("-win-x86.zip");
+        }
+    }
+    println!("download url:{}", node_url);
+
+    let path = Path::new(&save_path);
+    match fs::metadata(path) {
+        Ok(_) => {
+            return Ok(true);
+        }
+        Err(_) => {
+            let mut file = File::create(&save_path)?;
+            let client = Client::new();
+            let mut response = client.get(node_url).send().await?;
+            if response.status().is_success() {
+                while let Some(chunk) = response.chunk().await? {
+                    file.write_all(&chunk)?;
+                }
+                return Ok(true);
+            }
+        }
+    }
+    // 没有
+    Ok(false)
+}
+
+fn read_version_setting() -> Vec<Version> {
+    let mut binding = OpenOptions::new();
+    let options = binding.read(true).write(true).create(true);
+    let setting = options.open("setting.json");
+    match setting {
+        Ok(mut file) => {
+            let mut content: String = String::new();
+            file.read_to_string(&mut content).expect("读取内容错误");
+            let setting_json: Vec<Version> = serde_json::from_str(&content).expect("序列化错误");
+            return setting_json;
+        }
+        Err(_) => Vec::new(),
+    }
+}
+
+fn write_version_setting(settings: &Vec<Version>) -> Result<(), Box<dyn Error>> {
+    let mut binding = OpenOptions::new();
+    let options = binding.write(true).truncate(true);
+    let mut setting_file = options.open("setting.json").expect("open");
+    let json_str = serde_json::to_string_pretty(settings).unwrap();
+    println!("{:?}", json_str);
+    setting_file
+        .write_all(json_str.as_bytes())
+        .expect("Failed to open or create the file");
+    Ok(())
+}
+
+async fn _remote_node_list() -> Vec<String> {
+    let resp = reqwest::get(NODE_URL).await;
     match resp {
         Ok(body) => {
             let text = body.text().await.unwrap();
@@ -29,10 +154,63 @@ async fn get_version_list() -> Vec<String> {
     }
 }
 
+async fn remote_install_node(version_str: String) -> Vec<Version> {
+    let save = get_download_node_url(version_str.clone()).await.unwrap();
+    if save {
+        let mut setting_json: Vec<Version> = read_version_setting();
+        let row = setting_json
+            .iter_mut()
+            .find(|item| item.name == version_str)
+            .unwrap();
+        row.status = 1;
+        write_version_setting(&setting_json).unwrap();
+        return setting_json;
+    }
+    Vec::new()
+}
+
+// Learn more about Tauri commands at https://tauri.app/v1/guides/features/command
+#[tauri::command]
+async fn download_node(version_str: String) -> tauri::Result<Vec<Version>> {
+    let result = remote_install_node(version_str).await;
+    Ok(result)
+}
+
+#[tauri::command]
+async fn get_version_list() -> Vec<Version> {
+    let versions = read_version_setting();
+    versions
+}
+
+#[tauri::command]
+async fn unzip_version(version_str: String) -> String {
+    // 解压node文件
+    let mut node_zip_path = String::new();
+    node_zip_path.push_str("./node/");
+    node_zip_path.push_str(&version_str);
+    node_zip_path.push_str(".zip");
+    let path = Path::new(&node_zip_path);
+
+    let mut node_unzip_path = String::new();
+    node_unzip_path.push_str("./versions/");
+
+    match fs::metadata(&path) {
+        Err(_why) => String::new(),
+        Ok(_) => {
+            let _ = unzip(&node_zip_path, &node_unzip_path);
+            return String::new();
+        }
+    };
+    String::new()
+}
+
 fn main() {
     tauri::Builder::default()
-        .invoke_handler(tauri::generate_handler![greet])
-        .invoke_handler(tauri::generate_handler![get_version_list])
+        .invoke_handler(tauri::generate_handler![
+            get_version_list,
+            download_node,
+            unzip_version
+        ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

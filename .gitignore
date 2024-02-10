@@ -22,3 +22,7 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+src-tauri/node/*.zip
+src-tauri/versions/*
+
