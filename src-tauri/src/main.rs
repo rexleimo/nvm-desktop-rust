@@ -5,6 +5,7 @@ use std::{
     error::Error,
     fs::{self, File, OpenOptions},
     io::{self, BufReader, Read, Write},
+    os::windows::fs::symlink_dir,
     path::Path,
 };
 
@@ -18,6 +19,7 @@ use zip::ZipArchive;
 struct Version {
     name: String,
     status: i16,
+    is_use: bool,
 }
 
 #[derive(Debug)]
@@ -38,11 +40,11 @@ fn get_system_info() -> SystemInfo {
     }
 }
 
-fn unzip(zip_path: &str, dest_path: &str) {
+fn unzip(zip_path: &str, dest_path: &str) -> Result<(), io::Error> {
     let file = File::open(zip_path).unwrap();
     let mut zip = ZipArchive::new(BufReader::new(file)).unwrap();
 
-    let  target = Path::new(&dest_path);
+    let target = Path::new(&dest_path);
 
     if !target.exists() {
         let _ = fs::create_dir_all(target).map_err(|e| {
@@ -65,6 +67,7 @@ fn unzip(zip_path: &str, dest_path: &str) {
             io::copy(&mut file, &mut target_file).unwrap();
         }
     }
+    Ok(())
 }
 
 async fn get_download_node_url(version_str: String) -> Result<bool, Box<dyn std::error::Error>> {
@@ -128,7 +131,7 @@ fn write_version_setting(settings: &Vec<Version>) -> Result<(), Box<dyn Error>> 
     let options = binding.write(true).truncate(true);
     let mut setting_file = options.open("setting.json").expect("open");
     let json_str = serde_json::to_string_pretty(settings).unwrap();
-    println!("{:?}", json_str);
+    // println!("{:?}", json_str);
     setting_file
         .write_all(json_str.as_bytes())
         .expect("Failed to open or create the file");
@@ -183,7 +186,7 @@ async fn get_version_list() -> Vec<Version> {
 }
 
 #[tauri::command]
-async fn unzip_version(version_str: String) -> String {
+async fn unzip_version(version_str: String) -> Vec<Version> {
     // 解压node文件
     let mut node_zip_path = String::new();
     node_zip_path.push_str("./node/");
@@ -194,14 +197,50 @@ async fn unzip_version(version_str: String) -> String {
     let mut node_unzip_path = String::new();
     node_unzip_path.push_str("./versions/");
 
-    match fs::metadata(&path) {
-        Err(_why) => String::new(),
+    let new_versions = match fs::metadata(&path) {
+        Err(_why) => Vec::new(),
         Ok(_) => {
-            let _ = unzip(&node_zip_path, &node_unzip_path);
-            return String::new();
+            let result = match unzip(&node_zip_path, &node_unzip_path) {
+                Ok(_zip_resp) => {
+                    let mut setting_json = read_version_setting();
+                    let row = setting_json
+                        .iter_mut()
+                        .find(|item| item.name == version_str)
+                        .unwrap();
+                    row.status = 2;
+                    write_version_setting(&setting_json).unwrap();
+                    setting_json
+                }
+                Err(_) => Vec::new(),
+            };
+            result
         }
     };
-    String::new()
+    new_versions
+}
+
+#[tauri::command]
+fn use_version(version_str: String) -> String {
+    let mut target_dir = String::new();
+    target_dir.push_str("./versions/");
+    target_dir.push_str("node-v");
+    target_dir.push_str(&version_str);
+    target_dir.push_str("-win-x86");
+
+    let mut link_path = String::new();
+    link_path.push_str("./versions/");
+    link_path.push_str("default");
+
+    match symlink_dir(target_dir, link_path) {
+        Ok(_) => {
+            print!("OK");
+            String::new()
+        }
+        Err(e) => {
+            println!("{}", e);
+            String::new()
+        }
+    }
 }
 
 fn main() {
@@ -209,7 +248,8 @@ fn main() {
         .invoke_handler(tauri::generate_handler![
             get_version_list,
             download_node,
-            unzip_version
+            unzip_version,
+            use_version
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

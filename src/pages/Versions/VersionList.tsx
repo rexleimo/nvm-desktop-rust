@@ -32,6 +32,14 @@ function VersionList(props: VersionListProps) {
         });
     }, []);
 
+    const handleUseVersion = useCallback((version: string) => {
+        console.log(
+            invoke("use_version", {
+                versionStr: version,
+            })
+        );
+    }, []);
+
     return (
         <div className='ag-theme-quartz h-full w-full'>
             <AgGridReact
@@ -64,6 +72,7 @@ function VersionList(props: VersionListProps) {
                             if (0 === props.data.status) {
                                 return (
                                     <Button
+                                        disabled={props.data.isUse}
                                         color='gray'
                                         onClick={() =>
                                             handleDownloadNode(props.data.name)
@@ -82,6 +91,18 @@ function VersionList(props: VersionListProps) {
                                         }
                                     >
                                         安装
+                                    </Button>
+                                );
+                            }
+                            if (2 === props.data.status) {
+                                return (
+                                    <Button
+                                        color='blue'
+                                        onClick={() =>
+                                            handleUseVersion(props.data.name)
+                                        }
+                                    >
+                                        使用
                                     </Button>
                                 );
                             }

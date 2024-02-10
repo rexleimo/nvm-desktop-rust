@@ -1,38 +1,47 @@
 [
   {
     "name": "21.6.1",
-    "status": 1
+    "status": 2,
+    "is_use": true
   },
   {
     "name": "21.6.0",
-    "status": 1
+    "status": 1,
+    "is_use": false
   },
   {
     "name": "21.5.0",
-    "status": 1
+    "status": 1,
+    "is_use": false
   },
   {
     "name": "21.4.0",
-    "status": 1
+    "status": 1,
+    "is_use": false
   },
   {
     "name": "20.11.0",
-    "status": 1
+    "status": 1,
+    "is_use": false
   },
   {
     "name": "20.10.0",
-    "status": 1
+    "status": 1,
+    "is_use": false
   },
   {
     "name": "18.18.2",
-    "status": 0
+    "status": 0,
+    "is_use": false
   },
   {
     "name": "18.18.1",
-    "status": 0
+    "status": 0,
+    "is_use": false
   },
   {
     "name": "18.18.0",
-    "status": 0
+    "status": 0,
+    "is_use": false
   }
 ]
