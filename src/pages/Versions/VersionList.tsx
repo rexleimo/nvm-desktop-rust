@@ -33,11 +33,11 @@ function VersionList(props: VersionListProps) {
     }, []);
 
     const handleUseVersion = useCallback((version: string) => {
-        console.log(
-            invoke("use_version", {
-                versionStr: version,
-            })
-        );
+        invoke("use_version", {
+            versionStr: version,
+        }).then((res: any) => {
+            updateVersionLit(res);
+        });
     }, []);
 
     return (
@@ -97,6 +97,7 @@ function VersionList(props: VersionListProps) {
                             if (2 === props.data.status) {
                                 return (
                                     <Button
+                                        disabled={props.data.is_use}
                                         color='blue'
                                         onClick={() =>
                                             handleUseVersion(props.data.name)

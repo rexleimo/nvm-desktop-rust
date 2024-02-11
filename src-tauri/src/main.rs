@@ -5,8 +5,7 @@ use std::{
     error::Error,
     fs::{self, File, OpenOptions},
     io::{self, BufReader, Read, Write},
-    os::windows::fs::symlink_dir,
-    path::Path,
+    path::{Path, PathBuf},
 };
 
 use regex::Regex;
@@ -220,27 +219,41 @@ async fn unzip_version(version_str: String) -> Vec<Version> {
 }
 
 #[tauri::command]
-fn use_version(version_str: String) -> String {
+fn use_version(version_str: String) -> Vec<Version> {
     let mut target_dir = String::new();
     target_dir.push_str("./versions/");
     target_dir.push_str("node-v");
     target_dir.push_str(&version_str);
     target_dir.push_str("-win-x86");
 
-    let mut link_path = String::new();
-    link_path.push_str("./versions/");
-    link_path.push_str("default");
+    let mut link_dir = String::new();
+    link_dir.push_str("./versions/");
+    link_dir.push_str("default");
+    // let mut binding = OpenOptions::new();
+    // let options = binding.write(true).truncate(true).create(true).read(true);
+    // 先取消链接
+    match symlink::remove_symlink_dir(link_dir.clone()) {
+        Ok(_) => true,
+        Err(_) => false,
+    };
 
-    match symlink_dir(target_dir, link_path) {
-        Ok(_) => {
-            print!("OK");
-            String::new()
-        }
-        Err(e) => {
-            println!("{}", e);
-            String::new()
-        }
-    }
+    let target_path = fs::canonicalize(PathBuf::from(target_dir)).unwrap();
+    println!("{:?}", target_path);
+    println!("{}", link_dir);
+    symlink::symlink_dir(target_path, link_dir).unwrap();
+
+    let mut settings_json = read_version_setting();
+    settings_json
+        .iter_mut()
+        .for_each(|item| item.is_use = false);
+    let row = settings_json
+        .iter_mut()
+        .find(|item| item.name == version_str)
+        .unwrap();
+
+    row.is_use = true;
+    write_version_setting(&settings_json).unwrap();
+    settings_json
 }
 
 fn main() {
