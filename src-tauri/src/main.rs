@@ -63,7 +63,15 @@ fn unzip(zip_path: &str, dest_path: &str) -> Result<(), io::Error> {
             } else {
                 fs::File::open(file_path).unwrap()
             };
-            io::copy(&mut file, &mut target_file).unwrap();
+            let copy_result = io::copy(&mut file, &mut target_file);
+            match copy_result {
+                Ok(size) => {
+                    println!("{}", size);
+                }
+                Err(e) => {
+                    println!("{}", e);
+                }
+            }
         }
     }
     Ok(())
@@ -88,14 +96,15 @@ async fn get_download_node_url(version_str: String) -> Result<bool, Box<dyn std:
         }
     }
     println!("download url:{}", node_url);
-
+    let mut binding = OpenOptions::new();
+    let options = binding.read(true).write(true).truncate(true).create(true);
     let path = Path::new(&save_path);
     match fs::metadata(path) {
         Ok(_) => {
             return Ok(true);
         }
         Err(_) => {
-            let mut file = File::create(&save_path)?;
+            let mut file = options.open(path)?;
             let client = Client::new();
             let mut response = client.get(node_url).send().await?;
             if response.status().is_success() {
@@ -166,7 +175,7 @@ async fn remote_install_node(version_str: String) -> Vec<Version> {
             .unwrap();
         row.status = 1;
         write_version_setting(&setting_json).unwrap();
-        return setting_json
+        return setting_json;
     }
     Vec::new()
 }
@@ -257,7 +266,26 @@ fn use_version(version_str: String) -> Vec<Version> {
 }
 
 #[tauri::command]
-fn download_remote(version_str: String) {}
+async fn download_remote(version_str: String) -> Vec<Version> {
+    match get_download_node_url(version_str.clone()).await {
+        Ok(is_save) => {
+            let mut settings_json = read_version_setting();
+            if is_save {
+                let version = Version {
+                    name: version_str,
+                    status: 1,
+                    is_use: false,
+                };
+                settings_json.push(version);
+                write_version_setting(&settings_json).unwrap();
+                settings_json
+            } else {
+                settings_json
+            }
+        }
+        Err(_) => Vec::new(),
+    }
+}
 
 fn main() {
     tauri::Builder::default()

@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { VersionListProps } from "./types";
 import { invoke } from "@tauri-apps/api/tauri";
 import { AgGridReact } from "ag-grid-react";
-import { Badge, Button, TextField } from "@radix-ui/themes";
+import { Badge, Button, Link, TextField } from "@radix-ui/themes";
 import cn from "classnames";
 
 function VersionList(props: VersionListProps) {
@@ -53,14 +53,24 @@ function VersionList(props: VersionListProps) {
 
     return (
         <div className='ag-theme-quartz h-full w-full'>
-            <TextField.Root className={cn("flex", "items-center", cn("mb-4"))}>
+            <TextField.Root className={cn("flex", "items-center")}>
                 <TextField.Input
                     onChange={(e) => updateVersionTxt(e.target.value)}
+                    placeholder='清输入你想下载的版本号: 21.4.0'
                 />
                 <Button color='green' onClick={handleDownloadRemote}>
                     确认
                 </Button>
             </TextField.Root>
+
+            <Link
+                href='https://nodejs.org/dist'
+                className={cn("mb-4", "inline-flex", "my-3")}
+                target='_blank'
+            >
+                更多版本请查看: https://nodejs.org/dist
+            </Link>
+
             <AgGridReact
                 domLayout='autoHeight'
                 rowData={versionList}
