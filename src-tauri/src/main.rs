@@ -166,7 +166,7 @@ async fn remote_install_node(version_str: String) -> Vec<Version> {
             .unwrap();
         row.status = 1;
         write_version_setting(&setting_json).unwrap();
-        return setting_jsonsssss
+        return setting_json
     }
     Vec::new()
 }
