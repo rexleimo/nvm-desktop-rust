@@ -166,7 +166,7 @@ async fn remote_install_node(version_str: String) -> Vec<Version> {
             .unwrap();
         row.status = 1;
         write_version_setting(&setting_json).unwrap();
-        return setting_json;
+        return setting_jsonsssss
     }
     Vec::new()
 }
@@ -256,13 +256,17 @@ fn use_version(version_str: String) -> Vec<Version> {
     settings_json
 }
 
+#[tauri::command]
+fn download_remote(version_str: String) {}
+
 fn main() {
     tauri::Builder::default()
         .invoke_handler(tauri::generate_handler![
             get_version_list,
             download_node,
             unzip_version,
-            use_version
+            use_version,
+            download_remote
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

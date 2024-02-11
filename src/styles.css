@@ -24,3 +24,11 @@ body,
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+.rt-TextFieldInput:where(.rt-variant-surface) + :where(.rt-TextFieldChrome) {
+    background-color: transparent;
+}
+
+:where(.rt-TextFieldInput:focus) + .rt-TextFieldChrome {
+    outline: unset;
+}

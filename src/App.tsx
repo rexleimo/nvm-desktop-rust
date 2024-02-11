@@ -7,7 +7,6 @@ import { VersionList } from "./pages/Versions";
 function App() {
     return (
         <MainLayout>
-            新年快乐
             <VersionList />
         </MainLayout>
     );
