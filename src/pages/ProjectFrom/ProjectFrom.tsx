@@ -93,6 +93,14 @@ function ProjectFrom(props: ProjectFromProps) {
                     <Button onClick={openInputFile}>选择文件夹</Button>
                 </TextField.Root>
             </div>
+
+            <div className={cn(formItemClassName)}>
+                <label className={cn(formItemLabelClassName)}>启动命令：</label>
+                <span>{from.dir}</span>
+                <TextField.Root>
+                    <Button onClick={openInputFile}>选择文件夹</Button>
+                </TextField.Root>
+            </div>
         </>
     );
 }
