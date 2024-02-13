@@ -1,15 +1,18 @@
 // Prevents additional console window on Windows in release, DO NOT REMOVE!!
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+#[macro_use]
+extern crate lazy_static;
+
 use std::{
+    collections::HashMap,
     env,
     error::Error,
     fs::{self, File, OpenOptions},
     io::{self, BufReader, Read, Write},
     path::{Path, PathBuf},
-    process::{Command, Stdio},
-    thread,
-    time::Duration,
+    process::Command,
+    sync::Mutex,
 };
 
 use regex::Regex;
@@ -43,6 +46,13 @@ struct Project {
 }
 
 static NODE_URL: &str = "https://nodejs.org/dist/";
+
+lazy_static! {
+    static ref CMD_MAP: Mutex<HashMap<String, u32>> = {
+        let map = HashMap::new();
+        Mutex::new(map)
+    };
+}
 
 fn get_system_info() -> SystemInfo {
     let mut system = System::new_all();
@@ -347,15 +357,45 @@ fn run_project(project_name: String) {
     let os_cmd = "cmd.exe";
     let args = &["/c", &format!("cd /d {} && {}", directory, row.run_cmd)];
     let mut cmd = Command::new(os_cmd);
-    let child = cmd.args(args).spawn().unwrap();
+
+    if let Ok(run) = cmd.args(args).spawn() {
+        CMD_MAP.lock().unwrap().insert(project_name, run.id());
+        println!("{}", run.id());
+    }
 }
 
 #[tauri::command]
-async fn stop_project(project_name: String) {}
+async fn stop_project(project_name: String) {
+    let mut lock = CMD_MAP.lock().unwrap();
+    let pid = lock.get(&project_name).unwrap();
+
+    if let Ok(mut run) = Command::new("cmd.exe")
+        .args(&["/c", "taskkill /f /t /pid", pid.to_string().as_str()])
+        .spawn()
+    {
+        lock.remove(&project_name);
+        run.wait().unwrap();
+    }
+
+    println!("success taskkill");
+}
 
 #[tauri::command]
 async fn get_project_list() -> Vec<Project> {
     read_project_db()
+}
+
+#[tauri::command]
+async fn delete_project(project_name: String) -> Vec<Project> {
+    let settings_json = read_project_db();
+    let new_setting_json: Vec<Project> = settings_json
+        .iter()
+        .filter(|x| x.name != project_name)
+        .cloned()
+        .collect();
+    println!("{:?}", new_setting_json);
+    write_project_db(&new_setting_json).expect("写入文件失败");
+    new_setting_json
 }
 
 fn main() {
@@ -369,7 +409,8 @@ fn main() {
             create_project,
             get_project_list,
             run_project,
-            stop_project
+            stop_project,
+            delete_project
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

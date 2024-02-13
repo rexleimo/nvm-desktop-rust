@@ -6,6 +6,7 @@ import { useMount } from "ahooks";
 import { invoke } from "@tauri-apps/api";
 import { Button } from "@radix-ui/themes";
 import cn from "classnames";
+import { PlayIcon, PauseIcon, TrashIcon } from "@radix-ui/react-icons";
 
 function ProjectList(props: ProjectListProps) {
     const {} = props;
@@ -28,6 +29,12 @@ function ProjectList(props: ProjectListProps) {
     const stopProject = useCallback((projectName: string) => {
         invoke("stop_project", { projectName }).then((res) => {
             console.log(res);
+        });
+    }, []);
+
+    const deleteProject = useCallback((projectName: string) => {
+        invoke("delete_project", { projectName }).then((res: any) => {
+            updateProjectList(res);
         });
     }, []);
 
@@ -56,7 +63,7 @@ function ProjectList(props: ProjectListProps) {
                         cellClass: cn("flex items-center"),
                         cellRenderer: (props: any) => {
                             return (
-                                <>
+                                <div className={cn("flex", "gap-2")}>
                                     <Button
                                         color='green'
                                         className='cursor-pointer'
@@ -64,7 +71,7 @@ function ProjectList(props: ProjectListProps) {
                                             startProject(props.data.name)
                                         }
                                     >
-                                        运行
+                                        <PlayIcon />
                                     </Button>
                                     <Button
                                         color='red'
@@ -73,9 +80,18 @@ function ProjectList(props: ProjectListProps) {
                                             stopProject(props.data.name)
                                         }
                                     >
-                                        Stop
+                                        <PauseIcon />
                                     </Button>
-                                </>
+                                    <Button
+                                        color='crimson'
+                                        className='cursor-pointer'
+                                        onClick={() =>
+                                            deleteProject(props.data.name)
+                                        }
+                                    >
+                                        <TrashIcon />
+                                    </Button>
+                                </div>
                             );
                         },
                     },

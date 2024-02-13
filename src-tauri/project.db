@@ -1,8 +1,1 @@
-[
-  {
-    "name": "nvm-desktop-test",
-    "dir": "D:\\Github\\nodeDir\\nvm-desktop-test",
-    "version": "16.20.2",
-    "run_cmd": "npm run dev"
-  }
-]
+[]
