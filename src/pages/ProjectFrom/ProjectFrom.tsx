@@ -18,6 +18,7 @@ function ProjectFrom(props: ProjectFromProps) {
         name: "",
         dir: "",
         version: "",
+        run_cmd: "",
     });
 
     const openInputFile = useMemoizedFn(async () => {
@@ -34,6 +35,10 @@ function ProjectFrom(props: ProjectFromProps) {
             data.name = dirName;
         }
         setFrom(data);
+    });
+
+    const onSubmit = useMemoizedFn(() => {
+        invoke("create_project", { body: from }).then((res) => {});
     });
 
     useEffect(() => {
@@ -87,18 +92,31 @@ function ProjectFrom(props: ProjectFromProps) {
             </div>
 
             <div className={cn(formItemClassName)}>
-                <label className={cn(formItemLabelClassName)}>项目路径：</label>
-                <span>{from.dir}</span>
+                <label className={cn(formItemLabelClassName)}>启动命令：</label>
                 <TextField.Root>
-                    <Button onClick={openInputFile}>选择文件夹</Button>
+                    <TextField.Input
+                        style={{ width: 240 }}
+                        onChange={(e) => {
+                            setFrom({ ...from, run_cmd: e.target.value });
+                        }}
+                    />
                 </TextField.Root>
             </div>
 
             <div className={cn(formItemClassName)}>
-                <label className={cn(formItemLabelClassName)}>启动命令：</label>
-                <span>{from.dir}</span>
+                <label className={cn(formItemLabelClassName)}>项目路径：</label>
                 <TextField.Root>
                     <Button onClick={openInputFile}>选择文件夹</Button>
+                </TextField.Root>
+                <span>{from.dir}</span>
+            </div>
+
+            <div className={cn(formItemClassName)}>
+                <label className={cn(formItemLabelClassName)}></label>
+                <TextField.Root>
+                    <Button color='green' onClick={onSubmit}>
+                        确认
+                    </Button>
                 </TextField.Root>
             </div>
         </>

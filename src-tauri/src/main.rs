@@ -2,10 +2,14 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 use std::{
+    env,
     error::Error,
     fs::{self, File, OpenOptions},
     io::{self, BufReader, Read, Write},
     path::{Path, PathBuf},
+    process::{Command, Stdio},
+    thread,
+    time::Duration,
 };
 
 use regex::Regex;
@@ -13,6 +17,8 @@ use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use sysinfo::System;
 use zip::ZipArchive;
+
+mod cmd;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 struct Version {
@@ -26,6 +32,14 @@ struct Version {
 struct SystemInfo {
     name: String,
     cpu_arch: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+struct Project {
+    name: String,
+    dir: String,
+    version: String,
+    run_cmd: String,
 }
 
 static NODE_URL: &str = "https://nodejs.org/dist/";
@@ -143,6 +157,31 @@ fn write_version_setting(settings: &Vec<Version>) -> Result<(), Box<dyn Error>> 
     setting_file
         .write_all(json_str.as_bytes())
         .expect("Failed to open or create the file");
+    Ok(())
+}
+// 读取项目配置文件
+fn read_project_db() -> Vec<Project> {
+    let mut binding = OpenOptions::new();
+    let options = binding.read(true).write(true).create(true);
+    let project = options.open("project.db");
+
+    match project {
+        Ok(mut file) => {
+            let mut context = String::new();
+            file.read_to_string(&mut context).expect("读取文件错");
+            let setting_json: Vec<Project> = serde_json::from_str(&context).expect("序列化错误");
+            return setting_json;
+        }
+        Err(_) => Vec::new(),
+    }
+}
+// 写入项目配置文件
+fn write_project_db(project: &Vec<Project>) -> Result<(), Box<dyn Error>> {
+    let context = serde_json::to_string_pretty(project)?;
+    let mut binding = OpenOptions::new();
+    let options = binding.write(true).truncate(true);
+    let mut file = options.open("project.db")?;
+    file.write_all(context.as_bytes())?;
     Ok(())
 }
 
@@ -287,6 +326,38 @@ async fn download_remote(version_str: String) -> Vec<Version> {
     }
 }
 
+#[tauri::command]
+async fn create_project(body: Project) -> bool {
+    // add write project db
+    let mut settings_json = read_project_db();
+    settings_json.push(body);
+    write_project_db(&settings_json).unwrap();
+    true
+}
+
+#[tauri::command]
+fn run_project(project_name: String) {
+    let settings_json = read_project_db();
+    let row = settings_json
+        .iter()
+        .find(|x: &&Project| x.name == project_name)
+        .unwrap();
+
+    let directory = row.dir.replace("\\", "/");
+    let os_cmd = "cmd.exe";
+    let args = &["/c", &format!("cd /d {} && {}", directory, row.run_cmd)];
+    let mut cmd = Command::new(os_cmd);
+    let child = cmd.args(args).spawn().unwrap();
+}
+
+#[tauri::command]
+async fn stop_project(project_name: String) {}
+
+#[tauri::command]
+async fn get_project_list() -> Vec<Project> {
+    read_project_db()
+}
+
 fn main() {
     tauri::Builder::default()
         .invoke_handler(tauri::generate_handler![
@@ -294,7 +365,11 @@ fn main() {
             download_node,
             unzip_version,
             use_version,
-            download_remote
+            download_remote,
+            create_project,
+            get_project_list,
+            run_project,
+            stop_project
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
