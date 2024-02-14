@@ -25,4 +25,5 @@ dist-ssr
 
 src-tauri/node/*.zip
 src-tauri/versions/*
+src-tauri/project.sqlite3
 

@@ -21,7 +21,7 @@ sysinfo = "0.30.5"
 zip = "0.6"
 symlink = "0.1.0"
 lazy_static = "1.4.0"
-
+rusqlite = { version = "=0.30.0", features = ["bundled"] }
 
 [features]
 # this feature is used for production builds or when `devPath` points to the filesystem

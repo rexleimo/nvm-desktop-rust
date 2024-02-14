@@ -15,13 +15,16 @@ use std::{
     sync::Mutex,
 };
 
+use project::Project;
 use regex::Regex;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use sysinfo::System;
+use tauri::Result;
 use zip::ZipArchive;
 
 mod cmd;
+mod project;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 struct Version {
@@ -35,14 +38,6 @@ struct Version {
 struct SystemInfo {
     name: String,
     cpu_arch: String,
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
-struct Project {
-    name: String,
-    dir: String,
-    version: String,
-    run_cmd: String,
 }
 
 static NODE_URL: &str = "https://nodejs.org/dist/";
@@ -63,7 +58,7 @@ fn get_system_info() -> SystemInfo {
     }
 }
 
-fn unzip(zip_path: &str, dest_path: &str) -> Result<(), io::Error> {
+fn unzip(zip_path: &str, dest_path: &str) -> Result<()> {
     let file = File::open(zip_path).unwrap();
     let mut zip = ZipArchive::new(BufReader::new(file)).unwrap();
 
@@ -101,7 +96,7 @@ fn unzip(zip_path: &str, dest_path: &str) -> Result<(), io::Error> {
     Ok(())
 }
 
-async fn get_download_node_url(version_str: String) -> Result<bool, Box<dyn std::error::Error>> {
+async fn get_download_node_url(version_str: String) -> Result<bool> {
     // https://nodejs.org/dist/v21.6.1/node-v21.6.1-win-x86.zip
     let mut node_url = String::new();
     let mut save_path = String::new();
@@ -130,9 +125,9 @@ async fn get_download_node_url(version_str: String) -> Result<bool, Box<dyn std:
         Err(_) => {
             let mut file = options.open(path)?;
             let client = Client::new();
-            let mut response = client.get(node_url).send().await?;
+            let mut response = client.get(node_url).send().await.unwrap();
             if response.status().is_success() {
-                while let Some(chunk) = response.chunk().await? {
+                while let Some(chunk) = response.chunk().await.unwrap() {
                     file.write_all(&chunk)?;
                 }
                 return Ok(true);
@@ -158,40 +153,14 @@ fn read_version_setting() -> Vec<Version> {
     }
 }
 
-fn write_version_setting(settings: &Vec<Version>) -> Result<(), Box<dyn Error>> {
+fn write_version_setting(settings: &Vec<Version>) -> Result<()> {
     let mut binding = OpenOptions::new();
     let options = binding.write(true).truncate(true);
     let mut setting_file = options.open("setting.json").expect("open");
     let json_str = serde_json::to_string_pretty(settings).unwrap();
-    // println!("{:?}", json_str);
     setting_file
         .write_all(json_str.as_bytes())
         .expect("Failed to open or create the file");
-    Ok(())
-}
-// 读取项目配置文件
-fn read_project_db() -> Vec<Project> {
-    let mut binding = OpenOptions::new();
-    let options = binding.read(true).write(true).create(true);
-    let project = options.open("project.db");
-
-    match project {
-        Ok(mut file) => {
-            let mut context = String::new();
-            file.read_to_string(&mut context).expect("读取文件错");
-            let setting_json: Vec<Project> = serde_json::from_str(&context).expect("序列化错误");
-            return setting_json;
-        }
-        Err(_) => Vec::new(),
-    }
-}
-// 写入项目配置文件
-fn write_project_db(project: &Vec<Project>) -> Result<(), Box<dyn Error>> {
-    let context = serde_json::to_string_pretty(project)?;
-    let mut binding = OpenOptions::new();
-    let options = binding.write(true).truncate(true);
-    let mut file = options.open("project.db")?;
-    file.write_all(context.as_bytes())?;
     Ok(())
 }
 
@@ -337,22 +306,17 @@ async fn download_remote(version_str: String) -> Vec<Version> {
 }
 
 #[tauri::command]
-async fn create_project(body: Project) -> bool {
-    // add write project db
-    let mut settings_json = read_project_db();
-    settings_json.push(body);
-    write_project_db(&settings_json).unwrap();
-    true
+async fn create_project(body: Project) -> Result<bool> {
+    let execute = project::add_project(&body);
+    match execute {
+        Ok(_) => Ok(true),
+        Err(_) => Ok(false),
+    }
 }
 
 #[tauri::command]
 fn run_project(project_name: String) {
-    let settings_json = read_project_db();
-    let row = settings_json
-        .iter()
-        .find(|x: &&Project| x.name == project_name)
-        .unwrap();
-
+    let row = project::get_project(&project_name).unwrap();
     let directory = row.dir.replace("\\", "/");
     let os_cmd = "cmd.exe";
     let args = &["/c", &format!("cd /d {} && {}", directory, row.run_cmd)];
@@ -381,24 +345,20 @@ async fn stop_project(project_name: String) {
 }
 
 #[tauri::command]
-async fn get_project_list() -> Vec<Project> {
-    read_project_db()
+async fn get_project_list() -> Result<Vec<Project>> {
+    let projects = project::get_projects();
+    Ok(projects)
 }
 
 #[tauri::command]
 async fn delete_project(project_name: String) -> Vec<Project> {
-    let settings_json = read_project_db();
-    let new_setting_json: Vec<Project> = settings_json
-        .iter()
-        .filter(|x| x.name != project_name)
-        .cloned()
-        .collect();
-    println!("{:?}", new_setting_json);
-    write_project_db(&new_setting_json).expect("写入文件失败");
-    new_setting_json
+    project::delete_project(&project_name).unwrap();
+    let projects = project::get_projects();
+    projects
 }
 
 fn main() {
+    project::create_project().unwrap();
     tauri::Builder::default()
         .invoke_handler(tauri::generate_handler![
             get_version_list,
@@ -406,8 +366,8 @@ fn main() {
             unzip_version,
             use_version,
             download_remote,
-            create_project,
             get_project_list,
+            create_project,
             run_project,
             stop_project,
             delete_project
