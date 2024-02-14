@@ -7,11 +7,10 @@ extern crate lazy_static;
 use std::{
     collections::HashMap,
     env,
-    error::Error,
     fs::{self, File, OpenOptions},
     io::{self, BufReader, Read, Write},
     path::{Path, PathBuf},
-    process::Command,
+    process::{Command, Stdio},
     sync::Mutex,
 };
 
@@ -357,6 +356,20 @@ async fn delete_project(project_name: String) -> Vec<Project> {
     projects
 }
 
+#[tauri::command]
+async fn open_project(project_name: String) -> Result<()> {
+    let row = project::get_project(&project_name).unwrap();
+    let directory = row.dir.replace("\\", "/");
+    let os_cmd = "cmd.exe";
+    let mut cmd = Command::new(os_cmd);
+    println!("{}", directory);
+    cmd.args(vec!["/c", "start", "code", directory.as_str()])
+        .stdout(Stdio::piped());
+    let child = cmd.spawn().unwrap();
+    println!("{}", child.id());
+    Ok(())
+}
+
 fn main() {
     project::create_project().unwrap();
     tauri::Builder::default()
@@ -370,7 +383,8 @@ fn main() {
             create_project,
             run_project,
             stop_project,
-            delete_project
+            delete_project,
+            open_project
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

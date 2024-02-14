@@ -3,8 +3,9 @@ import { TextField, Button, Select } from "@radix-ui/themes";
 import { useMemoizedFn } from "ahooks";
 import { open } from "@tauri-apps/api/dialog";
 import cn from "classnames";
-import { useEffect, useState } from "react";
+import { useContext, useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api";
+import PageContext from "../../contexts/PageContext";
 
 const formItemClassName =
     "flex flex-row gap-4 min-w-0 shrink-0 mt-4 items-center";
@@ -12,7 +13,7 @@ const formItemLabelClassName = "shrink-0 text-right w-20";
 
 function ProjectFrom(props: ProjectFromProps) {
     const {} = props;
-
+    const { updatePageType } = useContext(PageContext);
     const [versionList, updateVersionLit] = useState([]);
     const [from, setFrom] = useState({
         name: "",
@@ -38,7 +39,9 @@ function ProjectFrom(props: ProjectFromProps) {
     });
 
     const onSubmit = useMemoizedFn(() => {
-        invoke("create_project", { body: from }).then((res) => {});
+        invoke("create_project", { body: from }).then(() => {
+            updatePageType?.("Project");
+        });
     });
 
     useEffect(() => {
