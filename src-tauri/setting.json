@@ -12,7 +12,7 @@
   {
     "name": "21.5.0",
     "status": 2,
-    "is_use": true
+    "is_use": false
   },
   {
     "name": "21.4.0",
@@ -36,13 +36,13 @@
   },
   {
     "name": "18.18.1",
-    "status": 2,
+    "status": 0,
     "is_use": false
   },
   {
     "name": "18.18.0",
-    "status": 0,
-    "is_use": false
+    "status": 2,
+    "is_use": true
   },
   {
     "name": "16.20.2",

@@ -321,9 +321,13 @@ fn run_project(project_name: String) {
     let args = &["/c", &format!("cd /d {} && {}", directory, row.run_cmd)];
     let mut cmd = Command::new(os_cmd);
 
-    if let Ok(run) = cmd.args(args).spawn() {
-        CMD_MAP.lock().unwrap().insert(project_name, run.id());
-        println!("{}", run.id());
+    cmd.args(args);
+
+    let pid = cmd::run(cmd, project_name.clone());
+
+    if pid > 0 {
+        CMD_MAP.lock().unwrap().insert(project_name, pid);
+        println!("项目启动： 进程ID为：{}，可在日志中查看运行情况", pid);
     }
 }
 
@@ -370,6 +374,39 @@ async fn open_project(project_name: String) -> Result<()> {
     Ok(())
 }
 
+#[tauri::command]
+async fn open_log(project_name: String) -> Result<()> {
+    let directory = Path::new("logs").join(format!("{}.log", &project_name));
+    println!("{}", directory.to_str().unwrap());
+    let os_cmd = "cmd.exe";
+    let mut cmd = Command::new(os_cmd);
+    cmd.args(vec!["/c", "start", "Notepad", directory.to_str().unwrap()]);
+    let mut child = cmd.spawn().unwrap();
+    println!("{}", child.id());
+    child.wait().unwrap();
+    Ok(())
+}
+
+#[tauri::command]
+async fn open_cmd(project_name: String) {
+    let row = project::get_project(&project_name).unwrap();
+    let directory = row.dir.replace("\\", "/");
+    println!("{}", directory);
+    let os_cmd = "cmd.exe";
+    let mut cmd = Command::new(os_cmd);
+    cmd.args(vec![
+        "/c",
+        "start",
+        "cmd",
+        "/K",
+        "cd /d",
+        directory.as_str(),
+    ]);
+    let mut child = cmd.spawn().unwrap();
+    println!("{}", child.id());
+    child.wait().unwrap();
+}
+
 fn main() {
     project::create_project().unwrap();
     tauri::Builder::default()
@@ -384,7 +421,9 @@ fn main() {
             run_project,
             stop_project,
             delete_project,
-            open_project
+            open_project,
+            open_log,
+            open_cmd
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
