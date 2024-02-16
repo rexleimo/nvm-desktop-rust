@@ -7,6 +7,7 @@ extern crate lazy_static;
 use std::{
     collections::HashMap,
     env,
+    fmt::format,
     fs::{self, File, OpenOptions},
     io::{self, BufReader, Write},
     path::{Path, PathBuf},
@@ -89,7 +90,7 @@ fn unzip(zip_path: &str, dest_path: &str) -> Result<()> {
     Ok(())
 }
 
-async fn get_download_node_url(version_str: String) -> Result<bool> {
+async fn get_download_node_url(version_str: String, app_handle: &tauri::AppHandle) -> Result<bool> {
     // https://nodejs.org/dist/v21.6.1/node-v21.6.1-win-x86.zip
     let mut node_url = String::new();
     let mut save_path = String::new();
@@ -118,11 +119,12 @@ async fn get_download_node_url(version_str: String) -> Result<bool> {
         Err(_) => {
             let mut file = options.open(path)?;
             let client = Client::new();
-            let mut response = client.get(node_url).send().await.unwrap();
+            let mut response: reqwest::Response = client.get(node_url).send().await.unwrap();
             if response.status().is_success() {
                 while let Some(chunk) = response.chunk().await.unwrap() {
                     file.write_all(&chunk)?;
                 }
+                log::send_log(app_handle, format!("下载版本{},成功", &version_str));
                 return Ok(true);
             }
         }
@@ -150,8 +152,13 @@ async fn _remote_node_list() -> Vec<String> {
     }
 }
 
-async fn remote_install_node(version_str: String) -> Vec<version::Version> {
-    let save = get_download_node_url(version_str.clone()).await.unwrap();
+async fn remote_install_node(
+    version_str: String,
+    app_handle: &tauri::AppHandle,
+) -> Vec<version::Version> {
+    let save = get_download_node_url(version_str.clone(), app_handle)
+        .await
+        .unwrap();
     let version_list = version::get_all_version();
     if save {
         let mut cur = version::get_version(&version_str).unwrap();
@@ -168,8 +175,11 @@ async fn remote_install_node(version_str: String) -> Vec<version::Version> {
 
 // Learn more about Tauri commands at https://tauri.app/v1/guides/features/command
 #[tauri::command]
-async fn download_node(version_str: String) -> tauri::Result<Vec<version::Version>> {
-    let result = remote_install_node(version_str).await;
+async fn download_node(
+    version_str: String,
+    app_handle: tauri::AppHandle,
+) -> tauri::Result<Vec<version::Version>> {
+    let result = remote_install_node(version_str, &app_handle).await;
     Ok(result)
 }
 
@@ -180,7 +190,7 @@ async fn get_version_list() -> Vec<version::Version> {
 }
 
 #[tauri::command]
-async fn unzip_version(version_str: String) -> Vec<version::Version> {
+async fn unzip_version(version_str: String, app_handle: tauri::AppHandle) -> Vec<version::Version> {
     // 解压node文件
     let mut node_zip_path = String::new();
     node_zip_path.push_str("./node/");
@@ -203,6 +213,7 @@ async fn unzip_version(version_str: String) -> Vec<version::Version> {
                     match ex {
                         Ok(ex) => {
                             if ex {
+                                log::send_log(&app_handle, format!("安装版本{}成功", &version_str));
                                 version::get_all_version()
                             } else {
                                 versions
@@ -220,7 +231,7 @@ async fn unzip_version(version_str: String) -> Vec<version::Version> {
 }
 
 #[tauri::command]
-fn use_version(version_str: String) -> Vec<version::Version> {
+fn use_version(version_str: String, app_handle: tauri::AppHandle) -> Vec<version::Version> {
     let mut target_dir = String::new();
     target_dir.push_str("./versions/");
     target_dir.push_str("node-v");
@@ -247,17 +258,21 @@ fn use_version(version_str: String) -> Vec<version::Version> {
     };
     let _ = version::update_version_is_use(&update_id);
     let version_list = version::get_all_version();
+    log::send_log(&app_handle, format!("切换到版本{}", &version_str));
     version_list
 }
 
 #[tauri::command]
-async fn download_remote(version_str: String) -> Vec<version::Version> {
+async fn download_remote(
+    version_str: String,
+    app_handle: tauri::AppHandle,
+) -> Vec<version::Version> {
     let mut version_list = version::get_all_version();
     if version_str.is_empty() {
         return version_list;
     }
 
-    match get_download_node_url(version_str.clone()).await {
+    match get_download_node_url(version_str.clone(), &app_handle).await {
         Ok(_) => {
             let payload = version::Version {
                 id: None,
@@ -283,10 +298,13 @@ async fn download_remote(version_str: String) -> Vec<version::Version> {
 }
 
 #[tauri::command]
-async fn create_project(body: Project) -> Result<bool> {
+async fn create_project(body: Project, app_handle: tauri::AppHandle) -> Result<bool> {
     let execute = project::add_project(&body);
     match execute {
-        Ok(_) => Ok(true),
+        Ok(_) => {
+            log::send_log(&app_handle, "创建项目成功".to_string());
+            Ok(true)
+        }
         Err(_) => Ok(false),
     }
 }
@@ -338,9 +356,10 @@ async fn get_project_list() -> Result<Vec<Project>> {
 }
 
 #[tauri::command]
-async fn delete_project(project_name: String) -> Vec<Project> {
+async fn delete_project(project_name: String, app_handle: tauri::AppHandle) -> Vec<Project> {
     project::delete_project(&project_name).unwrap();
     let projects = project::get_projects();
+    log::send_log(&app_handle, format!("项目删除： {}", &project_name));
     projects
 }
 
