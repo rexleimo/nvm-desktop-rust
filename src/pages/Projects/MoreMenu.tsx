@@ -2,7 +2,7 @@ import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import { MoreMenuProps } from "./types";
 import cn from "classnames";
 import { Button } from "@radix-ui/themes";
-import React, { useCallback, useContext } from "react";
+import React, { useCallback } from "react";
 import { invoke } from "@tauri-apps/api";
 import { TrashIcon, FileTextIcon } from "@radix-ui/react-icons";
 
