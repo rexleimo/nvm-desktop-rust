@@ -8,6 +8,7 @@ import { PageType } from "./types";
 import { PageContextProvider } from "./contexts/PageContext";
 import { ProjectList } from "./pages/Projects";
 import { ProjectFrom } from "./pages/ProjectFrom";
+import { LogSelect } from "./pages/LogSelect";
 
 function App() {
     const [pageType, updatePageType] = useState<PageType>("Version");
@@ -25,6 +26,14 @@ function App() {
                 {"Version" === pageType && <VersionList />}
                 {"Project" === pageType && <ProjectList />}
                 {"ProjectFrom" === pageType && <ProjectFrom />}
+                <div
+                    style={{
+                        visibility:
+                            "LogSelect" == pageType ? "visible" : "hidden",
+                    }}
+                >
+                    <LogSelect />
+                </div>
             </MainLayout>
         </PageContextProvider>
     );

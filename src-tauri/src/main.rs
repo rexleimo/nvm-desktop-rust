@@ -8,7 +8,7 @@ use std::{
     collections::HashMap,
     env,
     fs::{self, File, OpenOptions},
-    io::{self, BufReader, Read, Write},
+    io::{self, BufReader, Write},
     path::{Path, PathBuf},
     process::{Command, Stdio},
     sync::Mutex,
@@ -17,21 +17,14 @@ use std::{
 use project::Project;
 use regex::Regex;
 use reqwest::Client;
-use serde::{Deserialize, Serialize};
 use sysinfo::System;
 use tauri::Result;
 use zip::ZipArchive;
 
 mod cmd;
+mod log;
 mod project;
 mod version;
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
-struct Version {
-    name: String,
-    status: i16,
-    is_use: bool,
-}
 
 #[derive(Debug)]
 #[warn(dead_code)]
@@ -138,32 +131,6 @@ async fn get_download_node_url(version_str: String) -> Result<bool> {
     Ok(false)
 }
 
-fn read_version_setting() -> Vec<Version> {
-    let mut binding = OpenOptions::new();
-    let options = binding.read(true).write(true).create(true);
-    let setting = options.open("setting.json");
-    match setting {
-        Ok(mut file) => {
-            let mut content: String = String::new();
-            file.read_to_string(&mut content).expect("读取内容错误");
-            let setting_json: Vec<Version> = serde_json::from_str(&content).expect("序列化错误");
-            return setting_json;
-        }
-        Err(_) => Vec::new(),
-    }
-}
-
-fn write_version_setting(settings: &Vec<Version>) -> Result<()> {
-    let mut binding = OpenOptions::new();
-    let options = binding.write(true).truncate(true);
-    let mut setting_file = options.open("setting.json").expect("open");
-    let json_str = serde_json::to_string_pretty(settings).unwrap();
-    setting_file
-        .write_all(json_str.as_bytes())
-        .expect("Failed to open or create the file");
-    Ok(())
-}
-
 async fn _remote_node_list() -> Vec<String> {
     let resp = reqwest::get(NODE_URL).await;
     match resp {
@@ -183,24 +150,25 @@ async fn _remote_node_list() -> Vec<String> {
     }
 }
 
-async fn remote_install_node(version_str: String) -> Vec<Version> {
+async fn remote_install_node(version_str: String) -> Vec<version::Version> {
     let save = get_download_node_url(version_str.clone()).await.unwrap();
+    let version_list = version::get_all_version();
     if save {
-        let mut setting_json: Vec<Version> = read_version_setting();
-        let row = setting_json
-            .iter_mut()
-            .find(|item| item.name == version_str)
-            .unwrap();
-        row.status = 1;
-        write_version_setting(&setting_json).unwrap();
-        return setting_json;
+        let mut cur = version::get_version(&version_str).unwrap();
+        cur.status = 1;
+        let ex = version::update_version(&cur).unwrap();
+        if ex {
+            return version::get_all_version();
+        } else {
+            return version_list;
+        }
     }
-    Vec::new()
+    version_list
 }
 
 // Learn more about Tauri commands at https://tauri.app/v1/guides/features/command
 #[tauri::command]
-async fn download_node(version_str: String) -> tauri::Result<Vec<Version>> {
+async fn download_node(version_str: String) -> tauri::Result<Vec<version::Version>> {
     let result = remote_install_node(version_str).await;
     Ok(result)
 }
@@ -324,7 +292,7 @@ async fn create_project(body: Project) -> Result<bool> {
 }
 
 #[tauri::command]
-fn run_project(project_name: String) {
+fn run_project(project_name: String, app_handle: tauri::AppHandle) {
     let row = project::get_project(&project_name).unwrap();
     let directory = row.dir.replace("\\", "/");
     let os_cmd = "cmd.exe";
@@ -337,17 +305,22 @@ fn run_project(project_name: String) {
 
     if pid > 0 {
         CMD_MAP.lock().unwrap().insert(project_name, pid);
-        println!("项目启动： 进程ID为：{}，可在日志中查看运行情况", pid);
+        let txt = format!("项目启动： 进程ID为：{}，可在日志中查看运行情况", &pid);
+        log::send_log(&app_handle, txt);
     }
 }
 
 #[tauri::command]
-async fn stop_project(project_name: String) {
+async fn stop_project(project_name: String, app_handle: tauri::AppHandle) {
     let mut lock = CMD_MAP.lock().unwrap();
     let pid = lock.get(&project_name).unwrap();
-
+    let borrow_pid = pid.clone();
     if let Ok(mut run) = Command::new("cmd.exe")
-        .args(&["/c", "taskkill /f /t /pid", pid.to_string().as_str()])
+        .args(&[
+            "/c",
+            "taskkill /f /t /pid",
+            &borrow_pid.to_string().as_str(),
+        ])
         .spawn()
     {
         lock.remove(&project_name);
@@ -355,6 +328,7 @@ async fn stop_project(project_name: String) {
     }
 
     println!("success taskkill");
+    log::send_log(&app_handle, format!("项目关闭： 进程ID为：{}", &borrow_pid));
 }
 
 #[tauri::command]
@@ -419,7 +393,7 @@ async fn open_cmd(project_name: String) {
 
 fn main() {
     project::create_project().unwrap();
-    version::create_table();
+    version::create_or_update_table();
     tauri::Builder::default()
         .invoke_handler(tauri::generate_handler![
             get_version_list,

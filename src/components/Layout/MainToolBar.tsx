@@ -35,6 +35,16 @@ function MainToolBar(props: MainToolBarProps) {
                 >
                     项目管理
                 </NavigationMenu.Item>
+                <NavigationMenu.Item
+                    onClick={() => handleChangePageType("LogSelect")}
+                    className={cn(
+                        "p-[8px_16px]",
+                        cn("text-[12px]"),
+                        cn("cursor-pointer")
+                    )}
+                >
+                    日志
+                </NavigationMenu.Item>
             </NavigationMenu.List>
         </NavigationMenu.Root>
     );
