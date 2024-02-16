@@ -7,7 +7,6 @@ extern crate lazy_static;
 use std::{
     collections::HashMap,
     env,
-    fmt::format,
     fs::{self, File, OpenOptions},
     io::{self, BufReader, Write},
     path::{Path, PathBuf},
