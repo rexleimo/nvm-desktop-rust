@@ -126,7 +126,7 @@ function VersionList(props: VersionListProps) {
                             if (2 === props.data.status) {
                                 return (
                                     <Button
-                                        disabled={props.data.is_use}
+                                        disabled={props.data.is_use === 1}
                                         color='blue'
                                         onClick={() =>
                                             handleUseVersion(props.data.name)

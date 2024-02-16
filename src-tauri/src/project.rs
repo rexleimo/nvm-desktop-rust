@@ -95,4 +95,3 @@ pub fn get_project(project_name: &String) -> Option<Project> {
         .unwrap();
     Some(project_iter)
 }
-

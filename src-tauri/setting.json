@@ -42,11 +42,16 @@
   {
     "name": "18.18.0",
     "status": 2,
-    "is_use": true
+    "is_use": false
   },
   {
     "name": "16.20.2",
     "status": 2,
+    "is_use": true
+  },
+  {
+    "name": "16.20.2",
+    "status": 1,
     "is_use": false
   }
 ]

@@ -24,6 +24,7 @@ use zip::ZipArchive;
 
 mod cmd;
 mod project;
+mod version;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 struct Version {
@@ -205,13 +206,13 @@ async fn download_node(version_str: String) -> tauri::Result<Vec<Version>> {
 }
 
 #[tauri::command]
-async fn get_version_list() -> Vec<Version> {
-    let versions = read_version_setting();
+async fn get_version_list() -> Vec<version::Version> {
+    let versions = version::get_all_version();
     versions
 }
 
 #[tauri::command]
-async fn unzip_version(version_str: String) -> Vec<Version> {
+async fn unzip_version(version_str: String) -> Vec<version::Version> {
     // 解压node文件
     let mut node_zip_path = String::new();
     node_zip_path.push_str("./node/");
@@ -225,18 +226,24 @@ async fn unzip_version(version_str: String) -> Vec<Version> {
     let new_versions = match fs::metadata(&path) {
         Err(_why) => Vec::new(),
         Ok(_) => {
+            let versions = version::get_all_version();
             let result = match unzip(&node_zip_path, &node_unzip_path) {
                 Ok(_zip_resp) => {
-                    let mut setting_json = read_version_setting();
-                    let row = setting_json
-                        .iter_mut()
-                        .find(|item| item.name == version_str)
-                        .unwrap();
-                    row.status = 2;
-                    write_version_setting(&setting_json).unwrap();
-                    setting_json
+                    let mut current = version::get_version(&version_str).unwrap();
+                    current.status = 2;
+                    let ex = version::update_version(&current);
+                    match ex {
+                        Ok(ex) => {
+                            if ex {
+                                version::get_all_version()
+                            } else {
+                                versions
+                            }
+                        }
+                        Err(_) => versions,
+                    }
                 }
-                Err(_) => Vec::new(),
+                Err(_) => versions,
             };
             result
         }
@@ -245,7 +252,7 @@ async fn unzip_version(version_str: String) -> Vec<Version> {
 }
 
 #[tauri::command]
-fn use_version(version_str: String) -> Vec<Version> {
+fn use_version(version_str: String) -> Vec<version::Version> {
     let mut target_dir = String::new();
     target_dir.push_str("./versions/");
     target_dir.push_str("node-v");
@@ -255,8 +262,6 @@ fn use_version(version_str: String) -> Vec<Version> {
     let mut link_dir = String::new();
     link_dir.push_str("./versions/");
     link_dir.push_str("default");
-    // let mut binding = OpenOptions::new();
-    // let options = binding.write(true).truncate(true).create(true).read(true);
     // 先取消链接
     match symlink::remove_symlink_dir(link_dir.clone()) {
         Ok(_) => true,
@@ -264,43 +269,48 @@ fn use_version(version_str: String) -> Vec<Version> {
     };
 
     let target_path = fs::canonicalize(PathBuf::from(target_dir)).unwrap();
-    println!("{:?}", target_path);
-    println!("{}", link_dir);
     symlink::symlink_dir(target_path, link_dir).unwrap();
 
-    let mut settings_json = read_version_setting();
-    settings_json
-        .iter_mut()
-        .for_each(|item| item.is_use = false);
-    let row = settings_json
-        .iter_mut()
-        .find(|item| item.name == version_str)
-        .unwrap();
+    let current = version::get_version(&version_str).unwrap();
 
-    row.is_use = true;
-    write_version_setting(&settings_json).unwrap();
-    settings_json
+    let update_id = match current.id {
+        Some(id) => id,
+        None => 0,
+    };
+    let _ = version::update_version_is_use(&update_id);
+    let version_list = version::get_all_version();
+    version_list
 }
 
 #[tauri::command]
-async fn download_remote(version_str: String) -> Vec<Version> {
+async fn download_remote(version_str: String) -> Vec<version::Version> {
+    let mut version_list = version::get_all_version();
+    if version_str.is_empty() {
+        return version_list;
+    }
+
     match get_download_node_url(version_str.clone()).await {
-        Ok(is_save) => {
-            let mut settings_json = read_version_setting();
-            if is_save {
-                let version = Version {
-                    name: version_str,
-                    status: 1,
-                    is_use: false,
-                };
-                settings_json.push(version);
-                write_version_setting(&settings_json).unwrap();
-                settings_json
-            } else {
-                settings_json
+        Ok(_) => {
+            let payload = version::Version {
+                id: None,
+                name: version_str,
+                status: 1,
+                is_use: 0,
+            };
+
+            match version::insert_version(&payload) {
+                Ok(ex) => {
+                    if ex {
+                        version_list.push(payload);
+                        version_list
+                    } else {
+                        version_list
+                    }
+                }
+                Err(_) => version_list,
             }
         }
-        Err(_) => Vec::new(),
+        Err(_) => version_list,
     }
 }
 
@@ -409,6 +419,7 @@ async fn open_cmd(project_name: String) {
 
 fn main() {
     project::create_project().unwrap();
+    version::create_table();
     tauri::Builder::default()
         .invoke_handler(tauri::generate_handler![
             get_version_list,
