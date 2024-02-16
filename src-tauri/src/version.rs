@@ -17,8 +17,24 @@ pub fn open_db() -> Connection {
     return conn;
 }
 
-pub fn create_table() {
+pub fn create_or_update_table() {
     let conn = open_db();
+    let table_exists: Result<i32, Error> = conn.query_row(
+        format!(
+            "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='{}'",
+            TABLE_NAME
+        )
+        .as_str(),
+        [],
+        |row| row.get(0),
+    );
+    if table_exists == Ok(0) {
+        create_table(&conn);
+        init_table();
+    }
+}
+
+fn create_table(conn: &Connection) {
     conn.execute(
         format!(
             "CREATE TABLE IF NOT EXISTS {} (
@@ -34,6 +50,25 @@ pub fn create_table() {
     )
     .unwrap();
 }
+
+fn init_table() {
+    let init_versions = vec![
+        "21.6.2", "21.0.0", "20.6.0", "20.11.1", "20.11.0", "20.10.0", "20,9,0", "18.19.1",
+        "18.19.0", "18,18,0", "18.12.0",
+    ];
+
+    for version_str in init_versions {
+        let version = Version {
+            id: None,
+            name: version_str.to_string(),
+            status: 0,
+            is_use: 0,
+        };
+        let _ = insert_version(&version);
+    }
+}
+
+fn _update_table(_conn: &Connection) {}
 
 pub fn insert_version(version: &Version) -> Result<bool, Error> {
     let conn = open_db();
@@ -122,7 +157,6 @@ pub fn get_all_version() -> Vec<Version> {
     let mut result: Vec<Version> = Vec::new();
     for v in version {
         let v = v.unwrap();
-        println!("{:?}", v);
         result.push(v);
     }
     result

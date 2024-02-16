@@ -9,9 +9,10 @@ import { Theme } from "@radix-ui/themes";
 
 // Learn more about Tauri commands at https://tauri.app/v1/guides/features/command
 ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
-    <React.StrictMode>
-        <Theme>
-            <App />
-        </Theme>
-    </React.StrictMode>
+    // <React.StrictMode>
+
+    // </React.StrictMode>
+    <Theme>
+        <App />
+    </Theme>
 );
