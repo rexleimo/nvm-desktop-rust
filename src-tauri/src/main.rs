@@ -22,6 +22,7 @@ use tauri::Result;
 use zip::ZipArchive;
 
 mod cmd;
+mod folder;
 mod log;
 mod project;
 mod version;
@@ -34,6 +35,8 @@ struct SystemInfo {
 }
 
 static NODE_URL: &str = "https://nodejs.org/dist/";
+static NODE_DIR: &str = "./nodes";
+static VERSION_DIR: &str = "./versions";
 
 lazy_static! {
     static ref CMD_MAP: Mutex<HashMap<String, u32>> = {
@@ -92,44 +95,48 @@ fn unzip(zip_path: &str, dest_path: &str) -> Result<()> {
 async fn get_download_node_url(version_str: String, app_handle: &tauri::AppHandle) -> Result<bool> {
     // https://nodejs.org/dist/v21.6.1/node-v21.6.1-win-x86.zip
     let mut node_url = String::new();
-    let mut save_path = String::new();
-    node_url.push_str(NODE_URL);
-    save_path.push_str("./node/");
-    save_path.push_str(&version_str);
-    save_path.push_str(".zip");
-    let system = get_system_info();
-    if "Windows" == system.name {
-        if "x86" == system.cpu_arch {
-            node_url.push_str("v");
-            node_url.push_str(&version_str);
-            node_url.push_str("/node-v");
-            node_url.push_str(&version_str);
-            node_url.push_str("-win-x86.zip");
-        }
-    }
-    println!("download url:{}", node_url);
-    let mut binding = OpenOptions::new();
-    let options = binding.read(true).write(true).truncate(true).create(true);
-    let path = Path::new(&save_path);
-    match fs::metadata(path) {
+    let unzip_path = format!("{}{}.zip", NODE_DIR, &version_str);
+
+    match folder::no_exists_create_dir(NODE_DIR) {
         Ok(_) => {
-            return Ok(true);
-        }
-        Err(_) => {
-            let mut file = options.open(path)?;
-            let client = Client::new();
-            let mut response: reqwest::Response = client.get(node_url).send().await.unwrap();
-            if response.status().is_success() {
-                while let Some(chunk) = response.chunk().await.unwrap() {
-                    file.write_all(&chunk)?;
+            node_url.push_str(NODE_URL);
+            let system = get_system_info();
+            if "Windows" == system.name {
+                if "x86" == system.cpu_arch {
+                    let push_str = format!("v{}/node-v{}-win-x86.zip", &version_str, &version_str);
+                    node_url.push_str(push_str.as_str());
                 }
-                log::send_log(app_handle, format!("下载版本{},成功", &version_str));
-                return Ok(true);
             }
+            println!("download url:{}", node_url);
+            let mut binding = OpenOptions::new();
+            let options = binding.read(true).write(true).truncate(true).create(true);
+            let path = Path::new(&unzip_path);
+            match fs::metadata(path) {
+                Ok(_) => {
+                    return Ok(true);
+                }
+                Err(_) => {
+                    let mut file = options.open(path)?;
+                    let client = Client::new();
+                    let mut response: reqwest::Response =
+                        client.get(node_url).send().await.unwrap();
+                    if response.status().is_success() {
+                        while let Some(chunk) = response.chunk().await.unwrap() {
+                            file.write_all(&chunk)?;
+                        }
+                        log::send_log(&app_handle, format!("下载版本{},成功", &version_str));
+                        return Ok(true);
+                    }
+                }
+            }
+            // 没有
+            Ok(false)
+        }
+        Err(e) => {
+            log::send_log(&app_handle, e.to_string());
+            Ok(false)
         }
     }
-    // 没有
-    Ok(false)
 }
 
 async fn _remote_node_list() -> Vec<String> {
@@ -191,14 +198,13 @@ async fn get_version_list() -> Vec<version::Version> {
 #[tauri::command]
 async fn unzip_version(version_str: String, app_handle: tauri::AppHandle) -> Vec<version::Version> {
     // 解压node文件
-    let mut node_zip_path = String::new();
-    node_zip_path.push_str("./node/");
-    node_zip_path.push_str(&version_str);
-    node_zip_path.push_str(".zip");
+    let node_zip_path = format!("{}{}.zip", NODE_DIR, &version_str);
     let path = Path::new(&node_zip_path);
 
     let mut node_unzip_path = String::new();
-    node_unzip_path.push_str("./versions/");
+    node_unzip_path.push_str(VERSION_DIR);
+
+    folder::no_exists_create_dir(VERSION_DIR).unwrap();
 
     let new_versions = match fs::metadata(&path) {
         Err(_why) => Vec::new(),
