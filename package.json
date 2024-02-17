@@ -19,9 +19,11 @@
     "ag-grid-react": "^31.0.3",
     "ahooks": "^3.7.10",
     "autoprefixer": "^10.4.17",
+    "i18next": "^23.8.2",
     "postcss": "^8.4.35",
     "react": "^18.2.0",
-    "react-dom": "^18.2.0"
+    "react-dom": "^18.2.0",
+    "react-i18next": "^14.0.5"
   },
   "devDependencies": {
     "@tauri-apps/cli": "^1.5.8",

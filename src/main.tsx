@@ -5,6 +5,7 @@ import "ag-grid-community/styles/ag-theme-quartz.min.css";
 import "@radix-ui/themes/styles.css";
 import "./styles.css";
 import { Theme } from "@radix-ui/themes";
+import I18nextProvider from "./locales";
 
 // Learn more about Tauri commands at https://tauri.app/v1/guides/features/command
 ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
@@ -12,6 +13,8 @@ ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
 
     // </React.StrictMode>
     <Theme>
-        <App />
+        <I18nextProvider>
+            <App />
+        </I18nextProvider>
     </Theme>
 );

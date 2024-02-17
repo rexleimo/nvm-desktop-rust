@@ -4,12 +4,14 @@ import { invoke } from "@tauri-apps/api/tauri";
 import { AgGridReact } from "ag-grid-react";
 import { Badge, Button, Link, TextField } from "@radix-ui/themes";
 import cn from "classnames";
+import { useTranslation } from "react-i18next";
 
 function VersionList(props: VersionListProps) {
     const {} = props;
 
     const [versionList, updateVersionLit] = useState([]);
     const [versionTxt, updateVersionTxt] = useState<string>("");
+    const { t } = useTranslation();
 
     useEffect(() => {
         invoke("get_version_list").then((response: any) => {
@@ -52,14 +54,14 @@ function VersionList(props: VersionListProps) {
     }, [versionTxt]);
 
     return (
-        <div className='ag-theme-quartz h-full w-full'>
+        <div className='ag-theme-quartz h-[500px]'>
             <TextField.Root className={cn("flex", "items-center")}>
                 <TextField.Input
                     onChange={(e) => updateVersionTxt(e.target.value)}
-                    placeholder='清输入你想下载的版本号: 21.4.0'
+                    placeholder={`${t("download_input_placeholder")}: 21.4.0`}
                 />
                 <Button color='green' onClick={handleDownloadRemote}>
-                    确认
+                    {t("submit_txt")}
                 </Button>
             </TextField.Root>
 
@@ -68,15 +70,15 @@ function VersionList(props: VersionListProps) {
                 className={cn("mb-4", "inline-flex", "my-3")}
                 target='_blank'
             >
-                更多版本请查看: https://nodejs.org/dist
+                {t("for_more_version_see")}: https://nodejs.org/dist
             </Link>
 
             <AgGridReact
-                domLayout='autoHeight'
+                domLayout="normal"
                 rowData={versionList}
                 columnDefs={[
                     {
-                        headerName: "版本",
+                        headerName: t("version_txt"),
                         cellRenderer: (props: any) => {
                             return <>{props.data.name}</>;
                         },
@@ -84,18 +86,26 @@ function VersionList(props: VersionListProps) {
                         width: 375,
                     },
                     {
-                        headerName: "状态",
+                        headerName: t("status_txt"),
                         cellRenderer: (props: any) => {
                             if (0 === props.data.status) {
-                                return <Badge color='blue'>未下载</Badge>;
+                                return (
+                                    <Badge color='blue'>
+                                        {t("not_download_txt")}
+                                    </Badge>
+                                );
                             } else {
-                                return <Badge color='green'>以下载</Badge>;
+                                return (
+                                    <Badge color='green'>
+                                        {t("is_download_txt")}
+                                    </Badge>
+                                );
                             }
                         },
                         resizable: false,
                     },
                     {
-                        headerName: "操作",
+                        headerName: t("options_txt"),
                         cellClass: cn("flex items-center"),
                         cellRenderer: (props: any) => {
                             if (0 === props.data.status) {
@@ -107,7 +117,7 @@ function VersionList(props: VersionListProps) {
                                             handleDownloadNode(props.data.name)
                                         }
                                     >
-                                        下载
+                                        {t("download_txt")}
                                     </Button>
                                 );
                             }
@@ -119,7 +129,7 @@ function VersionList(props: VersionListProps) {
                                             handleInstallNode(props.data.name)
                                         }
                                     >
-                                        安装
+                                        {t("install_txt")}
                                     </Button>
                                 );
                             }
@@ -132,7 +142,7 @@ function VersionList(props: VersionListProps) {
                                             handleUseVersion(props.data.name)
                                         }
                                     >
-                                        使用
+                                        {t("use_txt")}
                                     </Button>
                                 );
                             }
