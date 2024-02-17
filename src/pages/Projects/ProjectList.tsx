@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import ProjectAdd from "./ProjectAdd";
 import { ProjectListProps } from "./types";
 import { AgGridReact } from "ag-grid-react";
@@ -16,6 +16,7 @@ function ProjectList(props: ProjectListProps) {
     const [runs, updateRuns] = useState<string[]>([]);
     const { t } = useTranslation();
     const timeRef = useRef<number>(0);
+    const tableCellRef = useRef<Map<string, any>>(new Map());
 
     useMount(() => {
         invoke("get_project_list").then((res: any) => {
@@ -38,35 +39,41 @@ function ProjectList(props: ProjectListProps) {
         });
     }, []);
 
-    useUpdateEffect(() => {
+    useEffect(() => {
         const handle = (runs: string[]) => {
             if (runs.length === 0) {
                 return;
             }
             timeRef.current = setTimeout(() => {
                 runs.forEach((projectName: string) => {
+                    const row = tableCellRef.current?.get(
+                        projectName
+                    ) as HTMLDivElement;
                     invoke("get_process_info", { projectName }).then(
                         (res: any) => {
                             if (res === null) return;
-                            updateProjectList((prev) => {
-                                let row = prev.find(
-                                    (item) => item.name === projectName
-                                );
-                                row.memory = (res.memory / 1024 / 1024).toFixed(
-                                    2
-                                );
-                                row.cpu_usage = (res.cpu_usage * 100).toFixed(
-                                    2
-                                );
-                                return Array.from(prev);
-                            });
+                            if (row) {
+                                const memorySpan = row.querySelector(
+                                    ".memory"
+                                ) as HTMLSpanElement;
+                                memorySpan.innerText = `memory:${(
+                                    res.memory /
+                                    1024 /
+                                    1024
+                                ).toFixed(2)}MB`;
+                                const cpuUsageSpan = row.querySelector(
+                                    ".cpu_usage"
+                                ) as HTMLSpanElement;
+                                cpuUsageSpan.innerText = `cpu_usage: ${(
+                                    res.cpu_usage * 100
+                                ).toFixed(2)}%`;
+                            }
                         }
                     );
                 });
                 handle(runs);
             }, 1000);
         };
-        console.log(runs);
         handle(runs);
         return () => {
             clearTimeout(timeRef.current);
@@ -99,12 +106,17 @@ function ProjectList(props: ProjectListProps) {
                         width: 200,
                         cellRenderer: (props: any) => {
                             return (
-                                <>
-                                    <span>memory:{props.data.memory}MB</span>,
-                                    <span>
-                                        cpu_usage:{props.data.cpu_usage}%
-                                    </span>
-                                </>
+                                <div
+                                    ref={(ref) => {
+                                        tableCellRef.current?.set(
+                                            props.data.name,
+                                            ref
+                                        );
+                                    }}
+                                >
+                                    <span className='memory'></span>,
+                                    <span className='cpu_usage'></span>
+                                </div>
                             );
                         },
                     },
