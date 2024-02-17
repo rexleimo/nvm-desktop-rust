@@ -9,7 +9,6 @@ import cn from "classnames";
 import { PlayIcon, PauseIcon } from "@radix-ui/react-icons";
 import MoreMenu from "./MoreMenu";
 
-
 function ProjectList(props: ProjectListProps) {
     const {} = props;
     const [projectList, updateProjectList] = useState<any[]>([]);
@@ -85,6 +84,7 @@ function ProjectList(props: ProjectListProps) {
                                         <PauseIcon />
                                     </Button>
                                     <MoreMenu
+                                        projectId={props.data.id}
                                         projectName={props.data.name}
                                         updateProjectList={updateProjectList}
                                     />

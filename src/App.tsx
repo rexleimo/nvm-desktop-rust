@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import "./App.css";
 import { MainLayout } from "./components/Layout";
 import { VersionList } from "./pages/Versions";
-import { PageType } from "./types";
+import { PageParams, PageType } from "./types";
 import { PageContextProvider } from "./contexts/PageContext";
 import { ProjectList } from "./pages/Projects";
 import { ProjectFrom } from "./pages/ProjectFrom";
@@ -12,13 +12,16 @@ import { LogSelect } from "./pages/LogSelect";
 
 function App() {
     const [pageType, updatePageType] = useState<PageType>("Version");
+    const [pageParams, updatePageParams] = useState<PageParams>();
 
     const contextValue = useMemo(() => {
         return {
             pageType,
             updatePageType,
+            pageParams,
+            updatePageParams,
         };
-    }, [pageType, updatePageType]);
+    }, [pageType, updatePageType, pageParams, updatePageParams]);
 
     return (
         <PageContextProvider value={contextValue}>

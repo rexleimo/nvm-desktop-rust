@@ -13,9 +13,10 @@ const formItemLabelClassName = "shrink-0 text-right w-20";
 
 function ProjectFrom(props: ProjectFromProps) {
     const {} = props;
-    const { updatePageType } = useContext(PageContext);
+    const { updatePageType, pageParams } = useContext(PageContext);
     const [versionList, updateVersionLit] = useState([]);
     const [from, setFrom] = useState({
+        id: undefined,
         name: "",
         dir: "",
         version: "",
@@ -51,6 +52,15 @@ function ProjectFrom(props: ProjectFromProps) {
             );
         });
     }, []);
+
+    useEffect(() => {
+        if (pageParams) {
+            const paramLength = Object.keys(pageParams).length;
+            if (paramLength > 0) {
+                setFrom(pageParams as any);
+            }
+        }
+    }, [pageParams]);
 
     return (
         <>
@@ -98,6 +108,7 @@ function ProjectFrom(props: ProjectFromProps) {
                 <label className={cn(formItemLabelClassName)}>启动命令：</label>
                 <TextField.Root>
                     <TextField.Input
+                        value={from.run_cmd}
                         style={{ width: 240 }}
                         onChange={(e) => {
                             setFrom({ ...from, run_cmd: e.target.value });
