@@ -9,6 +9,10 @@ use regex::Regex;
 use serde::{Deserialize, Serialize};
 use sysinfo::{Pid, System};
 
+use crate::folder;
+
+const LOG_DIR: &str = "./logs/";
+
 pub fn run(mut cmd: Command, project_name: String) -> u32 {
     let mut child = cmd
         .stdout(Stdio::piped())
@@ -22,18 +26,20 @@ pub fn run(mut cmd: Command, project_name: String) -> u32 {
         let stdout_reader = BufReader::new(stdout);
         let lines = stdout_reader.lines();
 
-        let mut binding = OpenOptions::new();
-        let options = binding.write(true).truncate(true).create(true);
-        let mut file = options
-            .open(format!("./logs/{}.log", &project_name))
-            .unwrap();
+        if let Ok(_) = folder::no_exists_create_dir(LOG_DIR) {
+            let mut binding = OpenOptions::new();
+            let options = binding.write(true).truncate(true).create(true);
+            let mut file = options
+                .open(format!("{}{}.log", LOG_DIR, &project_name))
+                .unwrap();
 
-        for line in lines {
-            let line = line.unwrap();
-            let re = Regex::new(r"\x1b\[[0-9;]*m").unwrap();
-            let writer = re.replace_all(&line, "").to_string();
-            file.write_all(writer.as_bytes()).unwrap();
-            file.write_all(b"\n").unwrap();
+            for line in lines {
+                let line = line.unwrap();
+                let re = Regex::new(r"\x1b\[[0-9;]*m").unwrap();
+                let writer = re.replace_all(&line, "").to_string();
+                file.write_all(writer.as_bytes()).unwrap();
+                file.write_all(b"\n").unwrap();
+            }
         }
     });
 

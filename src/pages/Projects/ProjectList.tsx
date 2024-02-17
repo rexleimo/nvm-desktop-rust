@@ -1,8 +1,8 @@
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import ProjectAdd from "./ProjectAdd";
 import { ProjectListProps } from "./types";
 import { AgGridReact } from "ag-grid-react";
-import { useMount, useUpdateEffect } from "ahooks";
+import { useMount } from "ahooks";
 import { invoke } from "@tauri-apps/api";
 import { Button } from "@radix-ui/themes";
 import cn from "classnames";
