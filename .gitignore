@@ -23,7 +23,7 @@ dist-ssr
 *.sln
 *.sw?
 
-src-tauri/node/*.zip
+src-tauri/nodes/*.zip
 src-tauri/versions/*
 src-tauri/project.sqlite3
 src-tauri/version.sqlite3

@@ -2,9 +2,10 @@ import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import { MoreMenuProps } from "./types";
 import cn from "classnames";
 import { Button } from "@radix-ui/themes";
-import React, { useCallback } from "react";
+import React, { useCallback, useContext } from "react";
 import { invoke } from "@tauri-apps/api";
-import { TrashIcon, FileTextIcon } from "@radix-ui/react-icons";
+import { TrashIcon, FileTextIcon, Pencil2Icon } from "@radix-ui/react-icons";
+import PageContext from "../../contexts/PageContext";
 
 const iconSize = 16;
 
@@ -55,10 +56,11 @@ function MoreMenuItem(props: DropdownMenu.DropdownMenuItemProps) {
 const MoreMenuItemMemo = React.memo(MoreMenuItem);
 
 function MoreMenu(props: MoreMenuProps) {
-    const { updateProjectList, projectName } = props;
+    const { updateProjectList, projectName, projectId } = props;
+    const { updatePageType, updatePageParams } = useContext(PageContext);
 
     const deleteProject = useCallback(() => {
-        invoke("delete_project", { projectName }).then((res: any) => {
+        invoke("delete_project", { id: projectId }).then((res: any) => {
             updateProjectList(res);
         });
     }, []);
@@ -75,6 +77,13 @@ function MoreMenu(props: MoreMenuProps) {
         invoke("open_cmd", { projectName }).then((_res: any) => {});
     }, []);
 
+    const editProject = useCallback(() => {
+        invoke("get_project_info", { projectName }).then((res: any) => {
+            updatePageType?.("ProjectFrom");
+            updatePageParams?.(res);
+        });
+    }, []);
+
     return (
         <DropdownMenu.Root>
             <DropdownMenu.Trigger asChild>
@@ -89,6 +98,9 @@ function MoreMenu(props: MoreMenuProps) {
 
             <DropdownMenu.Portal>
                 <DropdownMenu.Content className='min-w-[40px] bg-white rounded-md p-[5px] shadow-[0px_10px_38px_-10px_rgba(22,_23,_24,_0.35),_0px_10px_20px_-15px_rgba(22,_23,_24,_0.2)] will-change-[opacity,transform] data-[side=top]:animate-slideDownAndFade data-[side=right]:animate-slideLeftAndFade data-[side=bottom]:animate-slideUpAndFade data-[side=left]:animate-slideRightAndFade'>
+                    <MoreMenuItemMemo onClick={editProject}>
+                        <Pencil2Icon width={iconSize} height={iconSize} />
+                    </MoreMenuItemMemo>
                     <MoreMenuItemMemo onClick={deleteProject}>
                         <TrashIcon width={iconSize} height={iconSize} />
                     </MoreMenuItemMemo>

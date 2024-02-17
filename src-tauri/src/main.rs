@@ -35,8 +35,8 @@ struct SystemInfo {
 }
 
 static NODE_URL: &str = "https://nodejs.org/dist/";
-static NODE_DIR: &str = "./nodes";
-static VERSION_DIR: &str = "./versions";
+static NODE_DIR: &str = "./nodes/";
+static VERSION_DIR: &str = "./versions/";
 
 lazy_static! {
     static ref CMD_MAP: Mutex<HashMap<String, u32>> = {
@@ -361,10 +361,17 @@ async fn get_project_list() -> Result<Vec<Project>> {
 }
 
 #[tauri::command]
-async fn delete_project(project_name: String, app_handle: tauri::AppHandle) -> Vec<Project> {
-    project::delete_project(&project_name).unwrap();
+async fn get_project_info(project_name: String) -> Option<Project> {
+    let project = project::get_project(&project_name);
+    project
+}
+
+#[tauri::command]
+async fn delete_project(id: i32, app_handle: tauri::AppHandle) -> Vec<Project> {
+    let borrow_id = &id;
+    project::delete_project(borrow_id).unwrap();
     let projects = project::get_projects();
-    log::send_log(&app_handle, format!("项目删除： {}", &project_name));
+    log::send_log(&app_handle, format!("项目删除： {}", borrow_id));
     projects
 }
 
@@ -426,6 +433,7 @@ fn main() {
             use_version,
             download_remote,
             get_project_list,
+            get_project_info,
             create_project,
             run_project,
             stop_project,
