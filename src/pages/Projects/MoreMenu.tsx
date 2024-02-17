@@ -123,4 +123,4 @@ function MoreMenu(props: MoreMenuProps) {
 
 MoreMenu.Item = MoreMenuItem;
 
-export default MoreMenu;
+export default React.memo(MoreMenu);

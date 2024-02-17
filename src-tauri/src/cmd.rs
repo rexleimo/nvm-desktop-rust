@@ -6,6 +6,8 @@ use std::{
 };
 
 use regex::Regex;
+use serde::{Deserialize, Serialize};
+use sysinfo::{Pid, System};
 
 pub fn run(mut cmd: Command, project_name: String) -> u32 {
     let mut child = cmd
@@ -36,4 +38,37 @@ pub fn run(mut cmd: Command, project_name: String) -> u32 {
     });
 
     child.id()
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct ProcessInfo {
+    pub memory: u64,
+    pub cpu_usage: f32,
+}
+
+pub fn get_process_info(pid: usize) -> Option<ProcessInfo> {
+    let mut system = System::new();
+    system.refresh_all();
+    let pid = Pid::from(pid);
+    let borrow_pid = &pid;
+    if let Some(process) = system.process(*borrow_pid) {
+        let mut all_memory = process.memory();
+        let mut all_cpu_usage = process.cpu_usage();
+
+        system.processes().iter().for_each(|(_, row_process)| {
+            if let Some(parent_pid) = row_process.parent() {
+                if borrow_pid.eq(&parent_pid) {
+                    all_memory = all_memory + row_process.memory();
+                    all_cpu_usage = all_cpu_usage + row_process.cpu_usage()
+                }
+            }
+        });
+
+        Some(ProcessInfo {
+            memory: all_memory,
+            cpu_usage: all_cpu_usage,
+        })
+    } else {
+        None
+    }
 }

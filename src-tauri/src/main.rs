@@ -422,6 +422,25 @@ async fn open_cmd(project_name: String) {
     child.wait().unwrap();
 }
 
+#[tauri::command]
+async fn get_process_info(project_name: String) -> Option<cmd::ProcessInfo> {
+    let lock = CMD_MAP.lock().unwrap();
+
+    let pid: Option<&u32> = lock.get(&project_name);
+
+    match pid {
+        Some(pid) => {
+            let target_pid = &(*pid as usize);
+            if let Some(process) = cmd::get_process_info(*target_pid) {
+                Some(process)
+            } else {
+                None
+            }
+        }
+        None => None,
+    }
+}
+
 fn main() {
     project::create_project().unwrap();
     version::create_or_update_table();
@@ -440,7 +459,8 @@ fn main() {
             delete_project,
             open_project,
             open_log,
-            open_cmd
+            open_cmd,
+            get_process_info
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
