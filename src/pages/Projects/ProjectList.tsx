@@ -8,10 +8,12 @@ import { Button } from "@radix-ui/themes";
 import cn from "classnames";
 import { PlayIcon, PauseIcon } from "@radix-ui/react-icons";
 import MoreMenu from "./MoreMenu";
+import { useTranslation } from "react-i18next";
 
 function ProjectList(props: ProjectListProps) {
     const {} = props;
     const [projectList, updateProjectList] = useState<any[]>([]);
+    const { t } = useTranslation();
 
     useMount(() => {
         invoke("get_project_list").then((res: any) => {
@@ -43,18 +45,18 @@ function ProjectList(props: ProjectListProps) {
                 columnDefs={[
                     {
                         field: "name",
-                        headerName: "项目名称",
+                        headerName: t("project_txt"),
                         editable: false,
                         width: 200,
                     },
                     {
                         field: "dir",
-                        headerName: "项目路径",
+                        headerName: t("project_dir_txt"),
                         editable: false,
                         width: 400,
                     },
                     {
-                        headerName: "操作",
+                        headerName: t("project_options"),
                         cellClass: cn("flex items-center"),
                         cellRenderer: (props: any) => {
                             return (

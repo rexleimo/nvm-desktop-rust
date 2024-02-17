@@ -6,6 +6,7 @@ import React, { useCallback, useContext } from "react";
 import { invoke } from "@tauri-apps/api";
 import { TrashIcon, FileTextIcon, Pencil2Icon } from "@radix-ui/react-icons";
 import PageContext from "../../contexts/PageContext";
+import { useTranslation } from "react-i18next";
 
 const iconSize = 16;
 
@@ -58,6 +59,7 @@ const MoreMenuItemMemo = React.memo(MoreMenuItem);
 function MoreMenu(props: MoreMenuProps) {
     const { updateProjectList, projectName, projectId } = props;
     const { updatePageType, updatePageParams } = useContext(PageContext);
+    const { t } = useTranslation();
 
     const deleteProject = useCallback(() => {
         invoke("delete_project", { id: projectId }).then((res: any) => {
@@ -92,7 +94,7 @@ function MoreMenu(props: MoreMenuProps) {
                     highContrast
                     className={cn("cursor-pointer")}
                 >
-                    更多
+                    {t("more_txt")}
                 </Button>
             </DropdownMenu.Trigger>
 

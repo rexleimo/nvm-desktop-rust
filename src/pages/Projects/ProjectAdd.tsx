@@ -2,15 +2,16 @@ import cn from "classnames";
 import { Button } from "@radix-ui/themes";
 import { useContext } from "react";
 import PageContext from "../../contexts/PageContext";
+import { useTranslation } from "react-i18next";
 
 function ProjectAdd() {
     const { updatePageType } = useContext(PageContext);
-
+    const { t } = useTranslation();
     return (
         <>
             <div className={cn("text-right")}>
                 <Button onClick={() => updatePageType?.("ProjectFrom")}>
-                    添加项目
+                    {t("add_project_txt")}
                 </Button>
             </div>
         </>

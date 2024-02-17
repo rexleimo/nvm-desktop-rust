@@ -4,10 +4,14 @@ import cn from "classnames";
 import { useCallback, useContext } from "react";
 import { PageType } from "../../types";
 import PageContext from "../../contexts/PageContext";
+import { useTranslation } from "react-i18next";
 
 function MainToolBar(props: MainToolBarProps) {
     const {} = props;
     const { updatePageType } = useContext(PageContext);
+
+    const { t } = useTranslation();
+
     const handleChangePageType = useCallback((pageType: PageType) => {
         updatePageType?.(pageType);
     }, []);
@@ -23,7 +27,7 @@ function MainToolBar(props: MainToolBarProps) {
                         cn("cursor-pointer")
                     )}
                 >
-                    版本管理
+                    {t("version_manage")}
                 </NavigationMenu.Item>
                 <NavigationMenu.Item
                     onClick={() => handleChangePageType("Project")}
@@ -33,7 +37,7 @@ function MainToolBar(props: MainToolBarProps) {
                         cn("cursor-pointer")
                     )}
                 >
-                    项目管理
+                    {t("project_manage")}
                 </NavigationMenu.Item>
                 <NavigationMenu.Item
                     onClick={() => handleChangePageType("LogSelect")}
@@ -43,7 +47,7 @@ function MainToolBar(props: MainToolBarProps) {
                         cn("cursor-pointer")
                     )}
                 >
-                    日志
+                    {t("log_manage")}
                 </NavigationMenu.Item>
             </NavigationMenu.List>
         </NavigationMenu.Root>
