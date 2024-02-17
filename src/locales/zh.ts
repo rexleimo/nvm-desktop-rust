@@ -22,4 +22,5 @@ export default {
     please_select_version_txt: "请选择版本",
     startup_command: "启动命令",
     select_folder_txt: "选择文件夹",
+    locales_txt: "语言选择",
 };

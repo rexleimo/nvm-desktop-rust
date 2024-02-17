@@ -3,6 +3,7 @@ import { PageContextProps } from "../types";
 
 const PageContext = React.createContext<PageContextProps>({
     pageType: "Version",
+    locale: "en",
 });
 
 const PageContextProvider = PageContext.Provider;

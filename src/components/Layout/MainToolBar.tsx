@@ -5,10 +5,11 @@ import { useCallback, useContext } from "react";
 import { PageType } from "../../types";
 import PageContext from "../../contexts/PageContext";
 import { useTranslation } from "react-i18next";
+import { DropdownMenu } from "../DropdownMenu";
 
 function MainToolBar(props: MainToolBarProps) {
     const {} = props;
-    const { updatePageType } = useContext(PageContext);
+    const { updatePageType, updateLocale } = useContext(PageContext);
 
     const { t } = useTranslation();
 
@@ -48,6 +49,31 @@ function MainToolBar(props: MainToolBarProps) {
                     )}
                 >
                     {t("log_manage")}
+                </NavigationMenu.Item>
+
+                <NavigationMenu.Item
+                    className={cn(
+                        "p-[8px_16px]",
+                        cn("text-[12px]"),
+                        cn("cursor-pointer")
+                    )}
+                >
+                    <DropdownMenu
+                        items={["English", "简体中文"]}
+                        onClick={(item) => {
+                            if ("English" === item) {
+                                updateLocale?.("en");
+                                return;
+                            }
+
+                            if ("简体中文" === item) {
+                                updateLocale?.("zh");
+                                return;
+                            }
+                        }}
+                    >
+                        <span>{t("locales_txt")}</span>
+                    </DropdownMenu>
                 </NavigationMenu.Item>
             </NavigationMenu.List>
         </NavigationMenu.Root>

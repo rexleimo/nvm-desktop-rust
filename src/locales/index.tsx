@@ -24,3 +24,4 @@ function I18nextProvider(props: { children: React.ReactNode }) {
 }
 
 export default I18nextProvider;
+export { i18n };

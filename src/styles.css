@@ -16,7 +16,8 @@
 
 html,
 body,
-#root {
+#root,
+.radix-themes {
     height: 100%;
     width: 100%;
 }
@@ -32,4 +33,3 @@ body,
 :where(.rt-TextFieldInput:focus) + .rt-TextFieldChrome {
     outline: unset;
 }
-

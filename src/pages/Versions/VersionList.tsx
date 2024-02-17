@@ -54,14 +54,14 @@ function VersionList(props: VersionListProps) {
     }, [versionTxt]);
 
     return (
-        <div className='ag-theme-quartz h-full w-full'>
+        <div className='ag-theme-quartz h-[500px]'>
             <TextField.Root className={cn("flex", "items-center")}>
                 <TextField.Input
                     onChange={(e) => updateVersionTxt(e.target.value)}
                     placeholder={`${t("download_input_placeholder")}: 21.4.0`}
                 />
                 <Button color='green' onClick={handleDownloadRemote}>
-                    {t("submit_text")}
+                    {t("submit_txt")}
                 </Button>
             </TextField.Root>
 
@@ -74,7 +74,7 @@ function VersionList(props: VersionListProps) {
             </Link>
 
             <AgGridReact
-                domLayout='autoHeight'
+                domLayout="normal"
                 rowData={versionList}
                 columnDefs={[
                     {

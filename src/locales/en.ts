@@ -23,4 +23,5 @@ export default {
     please_select_version_txt: "Please select a version",
     startup_command: "Startup Command",
     select_folder_txt: "Select Folder",
+    locales_txt: "locales",
 };

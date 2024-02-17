@@ -9,10 +9,13 @@ import { PageContextProvider } from "./contexts/PageContext";
 import { ProjectList } from "./pages/Projects";
 import { ProjectFrom } from "./pages/ProjectFrom";
 import { LogSelect } from "./pages/LogSelect";
+import { useUpdateEffect } from "ahooks";
+import { i18n } from "./locales";
 
 function App() {
     const [pageType, updatePageType] = useState<PageType>("Version");
     const [pageParams, updatePageParams] = useState<PageParams>();
+    const [locale, updateLocale] = useState<string>("en");
 
     const contextValue = useMemo(() => {
         return {
@@ -20,8 +23,14 @@ function App() {
             updatePageType,
             pageParams,
             updatePageParams,
+            locale,
+            updateLocale,
         };
     }, [pageType, updatePageType, pageParams, updatePageParams]);
+
+    useUpdateEffect(() => {
+        i18n.changeLanguage(locale);
+    }, [locale]);
 
     return (
         <PageContextProvider value={contextValue}>
