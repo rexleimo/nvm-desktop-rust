@@ -24,6 +24,7 @@ dist-ssr
 *.sw?
 
 src-tauri/nodes/*.zip
+src-tauri/nodes/*.tar.gz
 src-tauri/versions/*
 src-tauri/project.sqlite3
 src-tauri/log.txt

@@ -25,6 +25,7 @@ mod cmd;
 mod folder;
 mod log;
 mod project;
+mod uzip;
 mod version;
 
 #[derive(Debug)]
@@ -48,9 +49,10 @@ lazy_static! {
 fn get_system_info() -> SystemInfo {
     let mut system = System::new_all();
     system.refresh_all();
+    let name = String::from(std::env::consts::OS);
     SystemInfo {
-        name: System::name().unwrap(),
-        cpu_arch: System::cpu_arch().unwrap(),
+        name: name,
+        cpu_arch: String::from(std::env::consts::ARCH),
     }
 }
 
@@ -101,12 +103,31 @@ async fn get_download_node_url(version_str: String, app_handle: &tauri::AppHandl
         Ok(_) => {
             node_url.push_str(NODE_URL);
             let system = get_system_info();
-            if "Windows" == system.name {
+            if "windows" == system.name {
                 if "x86" == system.cpu_arch {
                     let push_str = format!("v{}/node-v{}-win-x86.zip", &version_str, &version_str);
                     node_url.push_str(push_str.as_str());
                 }
             }
+
+            if "linux" == system.name {
+                if "x86" == system.cpu_arch {
+                    //https://nodejs.org/dist/v19.6.1/node-v19.6.1-linux-x64.tar.gz
+                    let push_str =
+                        format!("v{}/node-v{}-linux-x64.tar.xz", &version_str, &version_str);
+                    node_url.push_str(push_str.as_str());
+                }
+            }
+
+            if "macos" == system.name {
+                if "x86" == system.cpu_arch {
+                    //https://nodejs.org/dist/v19.6.1/node-v19.6.1-darwin-x64.tar.gz
+                    let push_str =
+                        format!("v{}/node-v{}-darwin-x64.tar.xz", &version_str, &version_str);
+                    node_url.push_str(push_str.as_str());
+                }
+            }
+
             println!("download url:{}", node_url);
             let mut binding = OpenOptions::new();
             let options = binding.read(true).write(true).truncate(true).create(true);
@@ -195,6 +216,7 @@ async fn get_version_list() -> Vec<version::Version> {
     versions
 }
 
+#[cfg(target_os = "windows")]
 #[tauri::command]
 async fn unzip_version(version_str: String, app_handle: tauri::AppHandle) -> Vec<version::Version> {
     // 解压node文件
@@ -233,6 +255,28 @@ async fn unzip_version(version_str: String, app_handle: tauri::AppHandle) -> Vec
         }
     };
     new_versions
+}
+
+#[cfg(target_os = "linux")]
+#[tauri::command]
+async fn unzip_version(version_str: String, app_handle: tauri::AppHandle) -> Vec<version::Version> {
+    let node_zip_path = format!("{}{}.tar.gz", NODE_DIR, &version_str);
+    let path = Path::new(&node_zip_path);
+
+    let mut node_unzip_path: String = String::new();
+    node_unzip_path.push_str(VERSION_DIR);
+
+    folder::no_exists_create_dir(VERSION_DIR).unwrap();
+
+    match fs::metadata(&path) {
+        Err(_why) => Vec::new(),
+        Ok(_) => {
+            node_unzip_path.push_str(format!("{}", &version_str).as_str());
+            uzip::linux_un_tar_gz(path.to_str().unwrap(), &node_unzip_path.to_string()).unwrap();
+            log::send_log(&app_handle, format!("安装版本{}成功", &version_str));
+            Vec::new()
+        }
+    }
 }
 
 #[tauri::command]

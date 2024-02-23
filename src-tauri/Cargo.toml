@@ -24,8 +24,13 @@ lazy_static = "1.4.0"
 rusqlite = { version = "=0.30.0", features = ["bundled"] }
 async-executor = "1.8.0"
 chrono = "0.4.34"
+tar = { version = "=0.4.40" }
+flate2 = { version = "^1.0.28" }
 
 [features]
 # this feature is used for production builds or when `devPath` points to the filesystem
 # DO NOT REMOVE!!
 custom-protocol = ["tauri/custom-protocol"]
+
+[target.x86_64-unknown-linux-musl]
+linker = "rust-lld"
