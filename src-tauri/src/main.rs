@@ -7,8 +7,8 @@ extern crate lazy_static;
 use std::{
     collections::HashMap,
     env,
-    fs::{self, File, OpenOptions},
-    io::{self, BufReader, Write},
+    fs::{self, OpenOptions},
+    io::Write,
     path::{Path, PathBuf},
     process::{Command, Stdio},
     sync::Mutex,
@@ -19,7 +19,6 @@ use regex::Regex;
 use reqwest::Client;
 use sysinfo::System;
 use tauri::Result;
-use zip::ZipArchive;
 
 mod cmd;
 mod folder;
@@ -56,44 +55,6 @@ fn get_system_info() -> SystemInfo {
     }
 }
 
-fn unzip(zip_path: &str, dest_path: &str) -> Result<()> {
-    let file = File::open(zip_path).unwrap();
-    let mut zip = ZipArchive::new(BufReader::new(file)).unwrap();
-
-    let target = Path::new(&dest_path);
-
-    if !target.exists() {
-        let _ = fs::create_dir_all(target).map_err(|e| {
-            println!("{}", e);
-        });
-    }
-
-    for i in 0..zip.len() {
-        let mut file = zip.by_index(i).unwrap();
-        if file.is_dir() {
-            let target = target.join(Path::new(&file.name().replace("\\", "")));
-            fs::create_dir_all(target).unwrap();
-        } else {
-            let file_path = target.join(Path::new(file.name()));
-            let mut target_file = if !file_path.exists() {
-                fs::File::create(file_path).unwrap()
-            } else {
-                fs::File::open(file_path).unwrap()
-            };
-            let copy_result = io::copy(&mut file, &mut target_file);
-            match copy_result {
-                Ok(size) => {
-                    println!("{}", size);
-                }
-                Err(e) => {
-                    println!("{}", e);
-                }
-            }
-        }
-    }
-    Ok(())
-}
-
 async fn get_download_node_url(version_str: String, app_handle: &tauri::AppHandle) -> Result<bool> {
     // https://nodejs.org/dist/v21.6.1/node-v21.6.1-win-x86.zip
     let mut node_url = String::new();
@@ -103,9 +64,11 @@ async fn get_download_node_url(version_str: String, app_handle: &tauri::AppHandl
         Ok(_) => {
             node_url.push_str(NODE_URL);
             let system = get_system_info();
+            println!("{}", system.cpu_arch);
             if "windows" == system.name {
-                if "x86" == system.cpu_arch {
-                    let push_str = format!("v{}/node-v{}-win-x86.zip", &version_str, &version_str);
+                if "x86_64" == system.cpu_arch {
+                    let push_str: String =
+                        format!("v{}/node-v{}-win-x86.zip", &version_str, &version_str);
                     node_url.push_str(push_str.as_str());
                 }
             }
@@ -232,7 +195,7 @@ async fn unzip_version(version_str: String, app_handle: tauri::AppHandle) -> Vec
         Err(_why) => Vec::new(),
         Ok(_) => {
             let versions = version::get_all_version();
-            let result = match unzip(&node_zip_path, &node_unzip_path) {
+            let result = match uzip::window_unzip(&node_zip_path, &node_unzip_path) {
                 Ok(_zip_resp) => {
                     let mut current = version::get_version(&version_str).unwrap();
                     current.status = 2;
@@ -257,7 +220,8 @@ async fn unzip_version(version_str: String, app_handle: tauri::AppHandle) -> Vec
     new_versions
 }
 
-#[cfg(target_os = "linux")]
+// macos 和 linux 走的tar.gz 双提取
+#[cfg(not(target_os = "windows"))]
 #[tauri::command]
 async fn unzip_version(version_str: String, app_handle: tauri::AppHandle) -> Vec<version::Version> {
     let node_zip_path = format!("{}{}.tar.gz", NODE_DIR, &version_str);
@@ -360,12 +324,9 @@ async fn create_project(body: Project, app_handle: tauri::AppHandle) -> Result<b
 
 #[tauri::command]
 fn run_project(project_name: String, app_handle: tauri::AppHandle) {
-    let row = project::get_project(&project_name).unwrap();
-    let directory = row.dir.replace("\\", "/");
-    let os_cmd = "cmd.exe";
-    let args = &["/c", &format!("cd /d {} && {}", directory, row.run_cmd)];
-    let mut cmd = Command::new(os_cmd);
+    let (os_cmd, args) = project::get_cmd_args(project_name.clone());
 
+    let mut cmd = Command::new(os_cmd);
     cmd.args(args);
 
     let pid = cmd::run(cmd, project_name.clone());

@@ -154,3 +154,26 @@ pub fn update_project(project: &Project) -> bool {
         Err(_) => false,
     }
 }
+
+#[cfg(not(target_os = "windows"))]
+pub fn get_cmd_args(project_name: &str) -> (&str, Vec<&str>) {
+    let row = get_project(project_name);
+    let directory = row.dir;
+
+    let os_cmd = "bash";
+    let args = &["-c", &format!("cd {} && {}", directory, row.run_cmd)];
+
+    (os_cmd, args)
+}
+
+#[cfg(target_os = "windows")]
+pub fn get_cmd_args(project_name: String) -> (String, Vec<String>) {
+    let row = get_project(&project_name).unwrap();
+    let directory = row.dir.replace("\\", "/");
+    let os_cmd = "cmd.exe";
+    let args = &["/c", &format!("cd /d {} && {}", directory, row.run_cmd)];
+    (
+        os_cmd.to_string(),
+        args.iter().map(|s| s.to_string()).collect(),
+    )
+}
