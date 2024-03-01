@@ -4,6 +4,10 @@
 #[macro_use]
 extern crate lazy_static;
 
+use nvm_desktop_rust::modules::os::{ide, system_info};
+use project::Project;
+use regex::Regex;
+use reqwest::Client;
 use std::{
     collections::HashMap,
     env,
@@ -13,10 +17,6 @@ use std::{
     process::{Command, Stdio},
     sync::Mutex,
 };
-
-use project::Project;
-use regex::Regex;
-use reqwest::Client;
 use sysinfo::System;
 use tauri::Result;
 
@@ -383,14 +383,15 @@ async fn delete_project(id: i32, app_handle: tauri::AppHandle) -> Vec<Project> {
 #[tauri::command]
 async fn open_project(project_name: String) -> Result<()> {
     let row = project::get_project(&project_name).unwrap();
-    let directory = row.dir.replace("\\", "/");
-    let os_cmd = "cmd.exe";
-    let mut cmd = Command::new(os_cmd);
-    println!("{}", directory);
-    cmd.args(vec!["/c", "start", "code", directory.as_str()])
-        .stdout(Stdio::piped());
-    let child = cmd.spawn().unwrap();
-    println!("{}", child.id());
+
+    let os_info = system_info::new();
+    if "windows" == os_info.name {
+        let directory = row.dir.replace("\\", "/");
+        ide::open(directory.as_str());
+    } else {
+        ide::open(row.dir.as_str());
+    }
+
     Ok(())
 }
 
