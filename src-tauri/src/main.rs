@@ -4,7 +4,10 @@
 #[macro_use]
 extern crate lazy_static;
 
-use nvm_desktop_rust::modules::os::{ide, system_info};
+use nvm_desktop_rust::modules::{
+    self,
+    os::{ide, system_info},
+};
 use project::Project;
 use regex::Regex;
 use reqwest::Client;
@@ -14,7 +17,7 @@ use std::{
     fs::{self, OpenOptions},
     io::Write,
     path::{Path, PathBuf},
-    process::{Command, Stdio},
+    process::Command,
     sync::Mutex,
 };
 use sysinfo::System;
@@ -324,13 +327,19 @@ async fn create_project(body: Project, app_handle: tauri::AppHandle) -> Result<b
 
 #[tauri::command]
 fn run_project(project_name: String, app_handle: tauri::AppHandle) {
-    let (os_cmd, args) = project::get_cmd_args(project_name.clone());
+    let args = project::get_cmd_args(&project_name);
+    let args_str: Vec<&str> = args.iter().map(|x| x.as_str()).collect();
+    let mut cmd = nvm_desktop_rust::modules::os::cmd::new(args_str.as_slice());
 
-    let mut cmd = Command::new(os_cmd);
-    cmd.args(args);
+    let mut binding = OpenOptions::new();
+    let options = binding.write(true).truncate(true).create(true);
+    let file = options
+        .open(format!("{}{}.log", "./logs/", &project_name))
+        .unwrap();
+    cmd.set_log(file);
 
-    let pid = cmd::run(cmd, project_name.clone());
-
+    let pid = cmd.run_async();
+    println!("pid: {}", pid);
     if pid > 0 {
         CMD_MAP.lock().unwrap().insert(project_name, pid);
         let txt = format!("项目启动： 进程ID为：{}，可在日志中查看运行情况", &pid);
@@ -412,20 +421,7 @@ async fn open_log(project_name: String) -> Result<()> {
 async fn open_cmd(project_name: String) {
     let row = project::get_project(&project_name).unwrap();
     let directory = row.dir.replace("\\", "/");
-    println!("{}", directory);
-    let os_cmd = "cmd.exe";
-    let mut cmd = Command::new(os_cmd);
-    cmd.args(vec![
-        "/c",
-        "start",
-        "cmd",
-        "/K",
-        "cd /d",
-        directory.as_str(),
-    ]);
-    let mut child = cmd.spawn().unwrap();
-    println!("{}", child.id());
-    child.wait().unwrap();
+    modules::os::cmd::open(&directory);
 }
 
 #[tauri::command]

@@ -1,13 +1,8 @@
+use std::process::Child;
 #[cfg(target_os = "windows")]
-pub fn open(directory: &str) -> u32 {
-    use std::process::{Command, Stdio};
+pub fn open(directory: &str) -> Child {
+    use crate::modules::os::cmd;
     println!("directory is:{}", &directory);
-    let mut shell = Command::new("cmd.exe");
-    shell.args(vec!["/c", "start", "code", directory]);
-
-    let child = shell
-        .stdout(Stdio::piped())
-        .spawn()
-        .expect("failed to execute process");
-    return child.id();
+    let mut manager = cmd::new(&vec!["/c", "start", "code", directory]);
+    manager.run()
 }

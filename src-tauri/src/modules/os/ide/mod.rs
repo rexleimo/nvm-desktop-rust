@@ -11,5 +11,5 @@ pub fn open(path: &str) -> u32 {
     #[cfg(not(target_os = "windows"))]
     let result = unix::open_vscode::open(path);
 
-    result
+    result.id()
 }

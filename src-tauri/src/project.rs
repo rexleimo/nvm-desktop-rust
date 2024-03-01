@@ -167,13 +167,9 @@ pub fn get_cmd_args(project_name: &str) -> (&str, Vec<&str>) {
 }
 
 #[cfg(target_os = "windows")]
-pub fn get_cmd_args(project_name: String) -> (String, Vec<String>) {
+pub fn get_cmd_args(project_name: &String) -> Vec<String> {
     let row = get_project(&project_name).unwrap();
     let directory = row.dir.replace("\\", "/");
-    let os_cmd = "cmd.exe";
     let args = &["/c", &format!("cd /d {} && {}", directory, row.run_cmd)];
-    (
-        os_cmd.to_string(),
-        args.iter().map(|s| s.to_string()).collect(),
-    )
+    args.iter().map(|s| s.to_string()).collect()
 }
