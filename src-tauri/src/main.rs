@@ -4,11 +4,13 @@
 #[macro_use]
 extern crate lazy_static;
 
-use nvm_desktop_rust::modules::{
-    self,
-    os::{ide, system_info},
+use nvm_desktop_rust::{
+    dots, handlers,
+    modules::{
+        self,
+        os::{ide, system_info},
+    },
 };
-use project::Project;
 use regex::Regex;
 use reqwest::Client;
 use std::{
@@ -17,16 +19,13 @@ use std::{
     fs::{self, OpenOptions},
     io::Write,
     path::{Path, PathBuf},
-    process::Command,
     sync::Mutex,
 };
 use sysinfo::System;
 use tauri::Result;
 
-mod cmd;
 mod folder;
 mod log;
-mod project;
 mod uzip;
 mod version;
 
@@ -314,8 +313,11 @@ async fn download_remote(
 }
 
 #[tauri::command]
-async fn create_project(body: Project, app_handle: tauri::AppHandle) -> Result<bool> {
-    let execute = project::add_project(&body);
+async fn create_project(
+    body: dots::project::Project,
+    app_handle: tauri::AppHandle,
+) -> Result<bool> {
+    let execute = handlers::project::create(body);
     match execute {
         Ok(_) => {
             log::send_log(&app_handle, "创建项目成功".to_string());
@@ -327,7 +329,7 @@ async fn create_project(body: Project, app_handle: tauri::AppHandle) -> Result<b
 
 #[tauri::command]
 fn run_project(project_name: String, app_handle: tauri::AppHandle) {
-    let args = project::get_cmd_args(&project_name);
+    let args = dots::project::get_cmd_args(&project_name);
     let args_str: Vec<&str> = args.iter().map(|x| x.as_str()).collect();
     let mut cmd = nvm_desktop_rust::modules::os::cmd::new(args_str.as_slice());
 
@@ -351,47 +353,49 @@ fn run_project(project_name: String, app_handle: tauri::AppHandle) {
 async fn stop_project(project_name: String, app_handle: tauri::AppHandle) {
     let mut lock = CMD_MAP.lock().unwrap();
     let pid = lock.get(&project_name).unwrap();
-    let borrow_pid = pid.clone();
-    if let Ok(mut run) = Command::new("cmd.exe")
-        .args(&[
-            "/c",
-            "taskkill /f /t /pid",
-            &borrow_pid.to_string().as_str(),
-        ])
-        .spawn()
+    let borrow_pid: u32 = pid.clone();
+    let mut args = String::new();
+
+    #[cfg(target_os = "windows")]
     {
-        lock.remove(&project_name);
-        run.wait().unwrap();
+        args.push_str(format!("/c taskkill /f /t /pid {}", &borrow_pid).as_str())
     }
+
+    #[cfg(not(target_os = "windows"))]
+    {
+        args.push_str(format!("kill -9 {}", &borrow_pid).as_str())
+    }
+
+    let mut command = nvm_desktop_rust::modules::os::cmd::new(&vec![args.as_str()]);
+    let mut sh = command.run();
+    lock.remove(&project_name);
+    sh.wait().unwrap();
 
     println!("success taskkill");
     log::send_log(&app_handle, format!("项目关闭： 进程ID为：{}", &borrow_pid));
 }
 
 #[tauri::command]
-async fn get_project_list() -> Result<Vec<Project>> {
-    let projects = project::get_projects();
-    Ok(projects)
+async fn get_project_list() -> Result<Vec<dots::project::Project>> {
+    Ok(handlers::project::lists())
 }
 
 #[tauri::command]
-async fn get_project_info(project_name: String) -> Option<Project> {
-    let project = project::get_project(&project_name);
-    project
+async fn get_project_info(project_name: String) -> Option<dots::project::Project> {
+    handlers::project::info(&project_name)
 }
 
 #[tauri::command]
-async fn delete_project(id: i32, app_handle: tauri::AppHandle) -> Vec<Project> {
+async fn delete_project(id: u32, app_handle: tauri::AppHandle) -> Vec<dots::project::Project> {
     let borrow_id = &id;
-    project::delete_project(borrow_id).unwrap();
-    let projects = project::get_projects();
+    let projects = handlers::project::delete(borrow_id);
     log::send_log(&app_handle, format!("项目删除： {}", borrow_id));
     projects
 }
 
 #[tauri::command]
 async fn open_project(project_name: String) -> Result<()> {
-    let row = project::get_project(&project_name).unwrap();
+    let row = dots::project::get_project(&project_name).unwrap();
 
     let os_info = system_info::new();
     if "windows" == os_info.name {
@@ -405,27 +409,16 @@ async fn open_project(project_name: String) -> Result<()> {
 }
 
 #[tauri::command]
-async fn open_log(project_name: String) -> Result<()> {
-    let directory = Path::new("logs").join(format!("{}.log", &project_name));
-    println!("{}", directory.to_str().unwrap());
-    let os_cmd = "cmd.exe";
-    let mut cmd = Command::new(os_cmd);
-    cmd.args(vec!["/c", "start", "Notepad", directory.to_str().unwrap()]);
-    let mut child = cmd.spawn().unwrap();
-    println!("{}", child.id());
-    child.wait().unwrap();
-    Ok(())
-}
-
-#[tauri::command]
 async fn open_cmd(project_name: String) {
-    let row = project::get_project(&project_name).unwrap();
+    let row = dots::project::get_project(&project_name).unwrap();
     let directory = row.dir.replace("\\", "/");
     modules::os::cmd::open(&directory);
 }
 
 #[tauri::command]
-async fn get_process_info(project_name: String) -> Option<cmd::ProcessInfo> {
+async fn get_process_info(
+    project_name: String,
+) -> Option<nvm_desktop_rust::modules::os::cmd::ProcessInfo> {
     let lock = CMD_MAP.lock().unwrap();
 
     let pid: Option<&u32> = lock.get(&project_name);
@@ -433,7 +426,7 @@ async fn get_process_info(project_name: String) -> Option<cmd::ProcessInfo> {
     match pid {
         Some(pid) => {
             let target_pid = &(*pid as usize);
-            if let Some(process) = cmd::get_process_info(*target_pid) {
+            if let Some(process) = nvm_desktop_rust::modules::os::cmd::process_info(target_pid) {
                 Some(process)
             } else {
                 None
@@ -443,8 +436,32 @@ async fn get_process_info(project_name: String) -> Option<cmd::ProcessInfo> {
     }
 }
 
+#[tauri::command]
+async fn open_log(project_name: String) -> Result<()> {
+    let directory = Path::new("logs").join(format!("{}.log", &project_name));
+
+    let mut args = String::new();
+
+    #[cfg(target_os = "windows")]
+    {
+        args.push_str(format!("/c start Notepad {}", directory.to_str().unwrap()).as_str());
+    }
+
+    #[cfg(not(target_os = "windows"))]
+    {
+        args.push_str(format!("-c Nano {}", directory.to_str().unwrap()).as_str());
+    }
+
+    let mut command = nvm_desktop_rust::modules::os::cmd::new(&vec![args.as_str()]);
+    let mut child = command.run();
+
+    println!("{}", child.id());
+    child.wait().unwrap();
+    Ok(())
+}
+
 fn main() {
-    project::create_project().unwrap();
+    nvm_desktop_rust::dots::project::create_project().unwrap();
     version::create_or_update_table();
     tauri::Builder::default()
         .invoke_handler(tauri::generate_handler![
@@ -455,13 +472,13 @@ fn main() {
             download_remote,
             get_project_list,
             get_project_info,
+            delete_project,
+            open_project,
             create_project,
             run_project,
             stop_project,
-            delete_project,
-            open_project,
-            open_log,
             open_cmd,
+            open_log,
             get_process_info
         ])
         .run(tauri::generate_context!())

@@ -8,6 +8,7 @@ use std::{
 };
 
 use regex::Regex;
+use serde::{Deserialize, Serialize};
 
 pub mod windows;
 
@@ -80,5 +81,18 @@ pub fn open(path: &str) {
     {
         let mut child = new(&vec!["/c", "start", "cmd", "/K", "cd /d", path]);
         child.run().wait().unwrap();
+    }
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct ProcessInfo {
+    pub memory: u64,
+    pub cpu_usage: f32,
+}
+
+pub fn process_info(pid: &usize) -> Option<ProcessInfo> {
+    #[cfg(target_os = "windows")]
+    {
+        windows::cmd::get_process_info(*pid)
     }
 }

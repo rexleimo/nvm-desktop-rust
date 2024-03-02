@@ -65,7 +65,7 @@ pub fn add_project(project: &Project) -> Result<bool, bool> {
     }
 }
 
-pub fn delete_project(id: &i32) -> Result<bool> {
+pub fn delete_project(id: &u32) -> Result<bool> {
     let conn = open_db();
     let execute = conn.execute("DELETE FROM projects WHERE id = ?1", (&id,))?;
     match execute {
