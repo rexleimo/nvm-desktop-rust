@@ -1979,6 +1979,7 @@ version = "0.0.0"
 dependencies = [
  "async-executor",
  "chrono",
+ "flate2",
  "lazy_static",
  "regex",
  "reqwest",
@@ -1987,6 +1988,7 @@ dependencies = [
  "serde_json",
  "symlink",
  "sysinfo",
+ "tar",
  "tauri",
  "tauri-build",
  "tokio",

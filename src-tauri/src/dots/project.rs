@@ -65,7 +65,7 @@ pub fn add_project(project: &Project) -> Result<bool, bool> {
     }
 }
 
-pub fn delete_project(id: &i32) -> Result<bool> {
+pub fn delete_project(id: &u32) -> Result<bool> {
     let conn = open_db();
     let execute = conn.execute("DELETE FROM projects WHERE id = ?1", (&id,))?;
     match execute {
@@ -153,4 +153,23 @@ pub fn update_project(project: &Project) -> bool {
         Ok(ex) => ex > 0,
         Err(_) => false,
     }
+}
+
+#[cfg(not(target_os = "windows"))]
+pub fn get_cmd_args(project_name: &str) -> (&str, Vec<&str>) {
+    let row = get_project(project_name);
+    let directory = row.dir;
+
+    let os_cmd = "bash";
+    let args = &["-c", &format!("cd {} && {}", directory, row.run_cmd)];
+
+    (os_cmd, args)
+}
+
+#[cfg(target_os = "windows")]
+pub fn get_cmd_args(project_name: &String) -> Vec<String> {
+    let row = get_project(&project_name).unwrap();
+    let directory = row.dir.replace("\\", "/");
+    let args = &["/c", &format!("cd /d {} && {}", directory, row.run_cmd)];
+    args.iter().map(|s| s.to_string()).collect()
 }

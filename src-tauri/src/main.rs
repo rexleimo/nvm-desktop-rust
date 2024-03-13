@@ -4,27 +4,29 @@
 #[macro_use]
 extern crate lazy_static;
 
+use nvm_desktop_rust::{
+    dots, handlers,
+    modules::{
+        self,
+        os::{ide, system_info},
+    },
+};
+use regex::Regex;
+use reqwest::Client;
 use std::{
     collections::HashMap,
     env,
-    fs::{self, File, OpenOptions},
-    io::{self, BufReader, Write},
+    fs::{self, OpenOptions},
+    io::Write,
     path::{Path, PathBuf},
-    process::{Command, Stdio},
     sync::Mutex,
 };
-
-use project::Project;
-use regex::Regex;
-use reqwest::Client;
 use sysinfo::System;
 use tauri::Result;
-use zip::ZipArchive;
 
-mod cmd;
 mod folder;
 mod log;
-mod project;
+mod uzip;
 mod version;
 
 #[derive(Debug)]
@@ -48,48 +50,11 @@ lazy_static! {
 fn get_system_info() -> SystemInfo {
     let mut system = System::new_all();
     system.refresh_all();
+    let name = String::from(std::env::consts::OS);
     SystemInfo {
-        name: System::name().unwrap(),
-        cpu_arch: System::cpu_arch().unwrap(),
+        name: name,
+        cpu_arch: String::from(std::env::consts::ARCH),
     }
-}
-
-fn unzip(zip_path: &str, dest_path: &str) -> Result<()> {
-    let file = File::open(zip_path).unwrap();
-    let mut zip = ZipArchive::new(BufReader::new(file)).unwrap();
-
-    let target = Path::new(&dest_path);
-
-    if !target.exists() {
-        let _ = fs::create_dir_all(target).map_err(|e| {
-            println!("{}", e);
-        });
-    }
-
-    for i in 0..zip.len() {
-        let mut file = zip.by_index(i).unwrap();
-        if file.is_dir() {
-            let target = target.join(Path::new(&file.name().replace("\\", "")));
-            fs::create_dir_all(target).unwrap();
-        } else {
-            let file_path = target.join(Path::new(file.name()));
-            let mut target_file = if !file_path.exists() {
-                fs::File::create(file_path).unwrap()
-            } else {
-                fs::File::open(file_path).unwrap()
-            };
-            let copy_result = io::copy(&mut file, &mut target_file);
-            match copy_result {
-                Ok(size) => {
-                    println!("{}", size);
-                }
-                Err(e) => {
-                    println!("{}", e);
-                }
-            }
-        }
-    }
-    Ok(())
 }
 
 async fn get_download_node_url(version_str: String, app_handle: &tauri::AppHandle) -> Result<bool> {
@@ -101,12 +66,33 @@ async fn get_download_node_url(version_str: String, app_handle: &tauri::AppHandl
         Ok(_) => {
             node_url.push_str(NODE_URL);
             let system = get_system_info();
-            if "Windows" == system.name {
-                if "x86" == system.cpu_arch {
-                    let push_str = format!("v{}/node-v{}-win-x86.zip", &version_str, &version_str);
+            println!("{}", system.cpu_arch);
+            if "windows" == system.name {
+                if "x86_64" == system.cpu_arch {
+                    let push_str: String =
+                        format!("v{}/node-v{}-win-x86.zip", &version_str, &version_str);
                     node_url.push_str(push_str.as_str());
                 }
             }
+
+            if "linux" == system.name {
+                if "x86" == system.cpu_arch {
+                    //https://nodejs.org/dist/v19.6.1/node-v19.6.1-linux-x64.tar.gz
+                    let push_str =
+                        format!("v{}/node-v{}-linux-x64.tar.xz", &version_str, &version_str);
+                    node_url.push_str(push_str.as_str());
+                }
+            }
+
+            if "macos" == system.name {
+                if "x86" == system.cpu_arch {
+                    //https://nodejs.org/dist/v19.6.1/node-v19.6.1-darwin-x64.tar.gz
+                    let push_str =
+                        format!("v{}/node-v{}-darwin-x64.tar.xz", &version_str, &version_str);
+                    node_url.push_str(push_str.as_str());
+                }
+            }
+
             println!("download url:{}", node_url);
             let mut binding = OpenOptions::new();
             let options = binding.read(true).write(true).truncate(true).create(true);
@@ -195,6 +181,7 @@ async fn get_version_list() -> Vec<version::Version> {
     versions
 }
 
+#[cfg(target_os = "windows")]
 #[tauri::command]
 async fn unzip_version(version_str: String, app_handle: tauri::AppHandle) -> Vec<version::Version> {
     // 解压node文件
@@ -210,7 +197,7 @@ async fn unzip_version(version_str: String, app_handle: tauri::AppHandle) -> Vec
         Err(_why) => Vec::new(),
         Ok(_) => {
             let versions = version::get_all_version();
-            let result = match unzip(&node_zip_path, &node_unzip_path) {
+            let result = match uzip::window_unzip(&node_zip_path, &node_unzip_path) {
                 Ok(_zip_resp) => {
                     let mut current = version::get_version(&version_str).unwrap();
                     current.status = 2;
@@ -233,6 +220,29 @@ async fn unzip_version(version_str: String, app_handle: tauri::AppHandle) -> Vec
         }
     };
     new_versions
+}
+
+// macos 和 linux 走的tar.gz 双提取
+#[cfg(not(target_os = "windows"))]
+#[tauri::command]
+async fn unzip_version(version_str: String, app_handle: tauri::AppHandle) -> Vec<version::Version> {
+    let node_zip_path = format!("{}{}.tar.gz", NODE_DIR, &version_str);
+    let path = Path::new(&node_zip_path);
+
+    let mut node_unzip_path: String = String::new();
+    node_unzip_path.push_str(VERSION_DIR);
+
+    folder::no_exists_create_dir(VERSION_DIR).unwrap();
+
+    match fs::metadata(&path) {
+        Err(_why) => Vec::new(),
+        Ok(_) => {
+            node_unzip_path.push_str(format!("{}", &version_str).as_str());
+            uzip::linux_un_tar_gz(path.to_str().unwrap(), &node_unzip_path.to_string()).unwrap();
+            log::send_log(&app_handle, format!("安装版本{}成功", &version_str));
+            Vec::new()
+        }
+    }
 }
 
 #[tauri::command]
@@ -303,8 +313,11 @@ async fn download_remote(
 }
 
 #[tauri::command]
-async fn create_project(body: Project, app_handle: tauri::AppHandle) -> Result<bool> {
-    let execute = project::add_project(&body);
+async fn create_project(
+    body: dots::project::Project,
+    app_handle: tauri::AppHandle,
+) -> Result<bool> {
+    let execute = handlers::project::create(body);
     match execute {
         Ok(_) => {
             log::send_log(&app_handle, "创建项目成功".to_string());
@@ -316,16 +329,19 @@ async fn create_project(body: Project, app_handle: tauri::AppHandle) -> Result<b
 
 #[tauri::command]
 fn run_project(project_name: String, app_handle: tauri::AppHandle) {
-    let row = project::get_project(&project_name).unwrap();
-    let directory = row.dir.replace("\\", "/");
-    let os_cmd = "cmd.exe";
-    let args = &["/c", &format!("cd /d {} && {}", directory, row.run_cmd)];
-    let mut cmd = Command::new(os_cmd);
+    let args = dots::project::get_cmd_args(&project_name);
+    let args_str: Vec<&str> = args.iter().map(|x| x.as_str()).collect();
+    let mut cmd = nvm_desktop_rust::modules::os::cmd::new(args_str.as_slice());
 
-    cmd.args(args);
+    let mut binding = OpenOptions::new();
+    let options = binding.write(true).truncate(true).create(true);
+    let file = options
+        .open(format!("{}{}.log", "./logs/", &project_name))
+        .unwrap();
+    cmd.set_log(file);
 
-    let pid = cmd::run(cmd, project_name.clone());
-
+    let pid = cmd.run_async();
+    println!("pid: {}", pid);
     if pid > 0 {
         CMD_MAP.lock().unwrap().insert(project_name, pid);
         let txt = format!("项目启动： 进程ID为：{}，可在日志中查看运行情况", &pid);
@@ -337,93 +353,115 @@ fn run_project(project_name: String, app_handle: tauri::AppHandle) {
 async fn stop_project(project_name: String, app_handle: tauri::AppHandle) {
     let mut lock = CMD_MAP.lock().unwrap();
     let pid = lock.get(&project_name).unwrap();
-    let borrow_pid = pid.clone();
-    if let Ok(mut run) = Command::new("cmd.exe")
-        .args(&[
-            "/c",
-            "taskkill /f /t /pid",
-            &borrow_pid.to_string().as_str(),
-        ])
-        .spawn()
+    let borrow_pid: u32 = pid.clone();
+    let mut args = String::new();
+
+    #[cfg(target_os = "windows")]
     {
-        lock.remove(&project_name);
-        run.wait().unwrap();
+        args.push_str(format!("/c taskkill /f /t /pid {}", &borrow_pid).as_str())
     }
+
+    #[cfg(not(target_os = "windows"))]
+    {
+        args.push_str(format!("kill -9 {}", &borrow_pid).as_str())
+    }
+
+    let mut command = nvm_desktop_rust::modules::os::cmd::new(&vec![args.as_str()]);
+    let mut sh = command.run();
+    lock.remove(&project_name);
+    sh.wait().unwrap();
 
     println!("success taskkill");
     log::send_log(&app_handle, format!("项目关闭： 进程ID为：{}", &borrow_pid));
 }
 
 #[tauri::command]
-async fn get_project_list() -> Result<Vec<Project>> {
-    let projects = project::get_projects();
-    Ok(projects)
+async fn get_project_list() -> Result<Vec<dots::project::Project>> {
+    Ok(handlers::project::lists())
 }
 
 #[tauri::command]
-async fn get_project_info(project_name: String) -> Option<Project> {
-    let project = project::get_project(&project_name);
-    project
+async fn get_project_info(project_name: String) -> Option<dots::project::Project> {
+    handlers::project::info(&project_name)
 }
 
 #[tauri::command]
-async fn delete_project(id: i32, app_handle: tauri::AppHandle) -> Vec<Project> {
+async fn delete_project(id: u32, app_handle: tauri::AppHandle) -> Vec<dots::project::Project> {
     let borrow_id = &id;
-    project::delete_project(borrow_id).unwrap();
-    let projects = project::get_projects();
+    let projects = handlers::project::delete(borrow_id);
     log::send_log(&app_handle, format!("项目删除： {}", borrow_id));
     projects
 }
 
 #[tauri::command]
 async fn open_project(project_name: String) -> Result<()> {
-    let row = project::get_project(&project_name).unwrap();
-    let directory = row.dir.replace("\\", "/");
-    let os_cmd = "cmd.exe";
-    let mut cmd = Command::new(os_cmd);
-    println!("{}", directory);
-    cmd.args(vec!["/c", "start", "code", directory.as_str()])
-        .stdout(Stdio::piped());
-    let child = cmd.spawn().unwrap();
-    println!("{}", child.id());
-    Ok(())
-}
+    let row = dots::project::get_project(&project_name).unwrap();
 
-#[tauri::command]
-async fn open_log(project_name: String) -> Result<()> {
-    let directory = Path::new("logs").join(format!("{}.log", &project_name));
-    println!("{}", directory.to_str().unwrap());
-    let os_cmd = "cmd.exe";
-    let mut cmd = Command::new(os_cmd);
-    cmd.args(vec!["/c", "start", "Notepad", directory.to_str().unwrap()]);
-    let mut child = cmd.spawn().unwrap();
-    println!("{}", child.id());
-    child.wait().unwrap();
+    let os_info = system_info::new();
+    if "windows" == os_info.name {
+        let directory = row.dir.replace("\\", "/");
+        ide::open(directory.as_str());
+    } else {
+        ide::open(row.dir.as_str());
+    }
+
     Ok(())
 }
 
 #[tauri::command]
 async fn open_cmd(project_name: String) {
-    let row = project::get_project(&project_name).unwrap();
+    let row = dots::project::get_project(&project_name).unwrap();
     let directory = row.dir.replace("\\", "/");
-    println!("{}", directory);
-    let os_cmd = "cmd.exe";
-    let mut cmd = Command::new(os_cmd);
-    cmd.args(vec![
-        "/c",
-        "start",
-        "cmd",
-        "/K",
-        "cd /d",
-        directory.as_str(),
-    ]);
-    let mut child = cmd.spawn().unwrap();
+    modules::os::cmd::open(&directory);
+}
+
+#[tauri::command]
+async fn get_process_info(
+    project_name: String,
+) -> Option<nvm_desktop_rust::modules::os::cmd::ProcessInfo> {
+    let lock = CMD_MAP.lock().unwrap();
+
+    let pid: Option<&u32> = lock.get(&project_name);
+
+    match pid {
+        Some(pid) => {
+            let target_pid = &(*pid as usize);
+            if let Some(process) = nvm_desktop_rust::modules::os::cmd::process_info(target_pid) {
+                Some(process)
+            } else {
+                None
+            }
+        }
+        None => None,
+    }
+}
+
+#[tauri::command]
+async fn open_log(project_name: String) -> Result<()> {
+    let directory = Path::new("logs").join(format!("{}.log", &project_name));
+
+    let mut args = String::new();
+
+    #[cfg(target_os = "windows")]
+    {
+        args.push_str(format!("/c start Notepad {}", directory.to_str().unwrap()).as_str());
+    }
+
+    #[cfg(not(target_os = "windows"))]
+    {
+        args.push_str(format!("-c Nano {}", directory.to_str().unwrap()).as_str());
+    }
+
+    let mut command = nvm_desktop_rust::modules::os::cmd::new(&vec![args.as_str()]);
+    let mut child = command.run();
+
     println!("{}", child.id());
     child.wait().unwrap();
+    Ok(())
 }
 
 fn main() {
-    project::create_project().unwrap();
+    nvm_desktop_rust::dots::project::create_project().unwrap();
     version::create_or_update_table();
     tauri::Builder::default()
         .invoke_handler(tauri::generate_handler![
@@ -434,13 +472,14 @@ fn main() {
             download_remote,
             get_project_list,
             get_project_info,
+            delete_project,
+            open_project,
             create_project,
             run_project,
             stop_project,
-            delete_project,
-            open_project,
+            open_cmd,
             open_log,
-            open_cmd
+            get_process_info
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
